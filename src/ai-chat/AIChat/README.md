@@ -193,9 +193,9 @@ await DataIngestor.IngestDataAsync(app.Services, new PDFDirectorySource(Path.Com
 Check out the ingestion cache database.
 
 <p>
-  <img alt="image" src="screenshots/connect-to-db.png" width="300">
+  <img alt="image" src="screenshots/connect-to-db.png" width="320">
 &nbsp;
-  <img alt="image" src="screenshots/set-conn-string.png" width="300">
+  <img alt="image" src="screenshots/set-conn-string.png" width="325">
 &nbsp;
   <img alt="image" src="screenshots/connected-to-sqlite-db.png" width="250">
 </p>
