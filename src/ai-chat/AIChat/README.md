@@ -181,7 +181,7 @@ var vectorStore = new JsonVectorStore(Path.Combine(AppContext.BaseDirectory, "ve
 ```
 Check the file in `/ai-on-dotnet/src/ai-chat/AIChat/bin/Debug/net9.0/vector-store/data-aichat-ingested.json`.
 
-<img width="250" alt="image" src="screenshots/generated-files.png">
+<img width="800" alt="image" src="screenshots/vector-embeddings-document.png">
 
 The vector store is used to persistently store vector embeddings for your document data that's being ingested 
 from the PDF files mentioned here:
