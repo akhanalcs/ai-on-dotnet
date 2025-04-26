@@ -96,7 +96,7 @@ https://docs.github.com/en/github-models/prototyping-with-ai-models#experimentin
 ### Taking a look around
 Go to models marketplace and select a model.
 
-<img width="1000" alt="image" src="../screenshots/github-models-select.png">
+<img width="1000" alt="image" src="screenshots/github-models-select.png">
 
 After you select the model, it opens the AI model playground which is a free resource that allows you to adjust model parameters and submit prompts to see how a model responds.
 It allows you to experiment with different models and parameters to find the best fit for your use case.
@@ -108,14 +108,14 @@ To adjust parameters for the model, in the playground, select the Parameters tab
     - This increases the likelihood of introducing new topics in a response.
 
 <p>
-  <img alt="image" src="../screenshots/github-model-params1.png" width="350">
+  <img alt="image" src="screenshots/github-model-params1.png" width="350">
 &nbsp;
-  <img alt="image" src="../screenshots/github-model-params2.png" width="350">
+  <img alt="image" src="screenshots/github-model-params2.png" width="350">
 </p>
 
 To see code that corresponds to the parameters that you selected, switch from the Chat tab to the Code tab.
 
-<img width="1000" alt="image" src="../screenshots/github-model-code.png">
+<img width="1000" alt="image" src="screenshots/github-model-code.png">
 
 ### Using the model
 Click > **Use this model** in the top right corner of the model page.
@@ -130,7 +130,7 @@ Steps. [Reference](https://docs.github.com/en/authentication/keeping-your-accoun
 - Permissions: Account permissions > Models > Access: Read-only.
 - Click **Generate token**.
 
-  <img width="350" alt="image" src="../screenshots/generate-github-pat.png">
+  <img width="350" alt="image" src="screenshots/generate-github-pat.png">
 - Copy the token. You won't be able to see it again.
 - From the command line, set token for this project using .NET User Secrets by running the following commands:
   ```sh
@@ -147,11 +147,15 @@ Steps. [Reference](https://docs.github.com/en/authentication/keeping-your-accoun
 ## Run the app
 Click the green play button in Rider to run the app.
 
-<img width="250" alt="image" src="../screenshots/rider-play.png">
+<img width="250" alt="image" src="screenshots/rider-play.png">
 
 The console will show the following output:
 ```bash
 /Users/ashishkhanal/RiderProjects/ai-on-dotnet/src/ai-chat/AIChat/bin/Debug/net9.0/AIChat
+info: AIChat.Services.Ingestion.DataIngestor[0]
+      Processing Example_Emergency_Survival_Kit.pdf
+info: AIChat.Services.Ingestion.DataIngestor[0]
+      Processing Example_GPS_Watch.pdf
 info: AIChat.Services.Ingestion.DataIngestor[0]
       Ingestion is up-to-date
 info: Microsoft.Hosting.Lifetime[14]
@@ -168,7 +172,30 @@ info: Microsoft.Hosting.Lifetime[0]
 
 Some files are generated in the `AIChat` folder:
 
-<img width="250" alt="image" src="../screenshots/generated-files.png">
+<img width="250" alt="image" src="screenshots/generated-files.png">
+
+## Check out the code
+```csharp
+// In program.cs
+var vectorStore = new JsonVectorStore(Path.Combine(AppContext.BaseDirectory, "vector-store"));
+```
+Check the file in `/ai-on-dotnet/src/ai-chat/AIChat/bin/Debug/net9.0/vector-store/data-aichat-ingested.json`.
+
+<img width="250" alt="image" src="screenshots/generated-files.png">
+
+The vector store is used to persistently store vector embeddings for your document data that's being ingested 
+from the PDF files mentioned here:
+```csharp
+// In program.cs
+await DataIngestor.IngestDataAsync(app.Services, new PDFDirectorySource(Path.Combine(builder.Environment.WebRootPath, "Data")));
+```
+
+Check out the ingestion cache database.
+
+Open Database tool window > + > Connect to database
+
+Query Consoles > Open Default Console
+
 
 
 

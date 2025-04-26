@@ -27,6 +27,9 @@ var embeddingGenerator = ghModelsClient.GetEmbeddingClient("text-embedding-3-sma
 var vectorStore = new JsonVectorStore(Path.Combine(AppContext.BaseDirectory, "vector-store"));
 
 builder.Services.AddSingleton<IVectorStore>(vectorStore);
+// Note: Scoped services are created once per client request, not per user
+// Services should typically have the same or shorter lifetime than their dependencies.
+//   Imagine a bucket. You should put things that are either the same size or smaller than it in the bucket.
 builder.Services.AddScoped<DataIngestor>();
 builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddChatClient(chatClient).UseFunctionInvocation().UseLogging();
