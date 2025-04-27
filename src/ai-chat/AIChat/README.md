@@ -175,8 +175,17 @@ Some files are generated in the `AIChat` folder:
 <img width="250" alt="image" src="screenshots/generated-files.png">
 
 ## Check out the code
+### Program.cs
+Embeddings are vector representations of text that capture semantic meaning, allowing for similarity comparisons
+between different pieces of text. The embedding generator converts text into these numerical vectors.
+
 ```csharp
-// In program.cs
+// The system ingests documents (like PDFs), converts their content to embeddings, stores them, and then can find
+// semantically related content when needed.
+var embeddingGenerator = ghModelsClient.GetEmbeddingClient("text-embedding-3-small").AsIEmbeddingGenerator();
+```
+
+```csharp
 var vectorStore = new JsonVectorStore(Path.Combine(AppContext.BaseDirectory, "vector-store"));
 ```
 Check the file in `/ai-on-dotnet/src/ai-chat/AIChat/bin/Debug/net9.0/vector-store/data-aichat-ingested.json`.
@@ -200,8 +209,129 @@ Check out the ingestion cache database.
   <img alt="image" src="screenshots/connected-to-sqlite-db.png" width="250">
 </p>
 
-Query Consoles > Open Default Console
+Query Consoles > Default Query Console
 
+<img alt="image" src="screenshots/default-query-console.png" width="250">
 
+```sql
+Select *
+From Documents
+```
+<details>
+  <summary>Query result</summary>
 
+| Id | SourceId | Version |
+| :--- | :--- | :--- |
+| Example\_Emergency\_Survival\_Kit.pdf | PDFDirectorySource:/Users/ashishkhanal/RiderProjects/ai-on-dotnet/src/ai-chat/AIChat/wwwroot/Data | 2025-04-20T20:22:58.5601402Z |
+| Example\_GPS\_Watch.pdf | PDFDirectorySource:/Users/ashishkhanal/RiderProjects/ai-on-dotnet/src/ai-chat/AIChat/wwwroot/Data | 2025-04-20T20:22:58.5663617Z |
+
+</details>
+
+```sql
+Select *
+From Records
+```
+
+<details>
+  <summary>Query result</summary>
+
+| Id | DocumentId |
+| :--- | :--- |
+| Example\_Emergency\_Survival\_Kit\_1\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_10\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_10\_1 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_10\_2 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_10\_3 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_11\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_11\_1 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_11\_2 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_11\_3 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_12\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_2\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_2\_1 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_2\_2 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_2\_3 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_2\_4 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_2\_5 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_2\_6 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_2\_7 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_3\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_4\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_5\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_5\_1 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_6\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_6\_1 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_7\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_7\_1 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_8\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_8\_1 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_9\_0 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_9\_1 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_9\_2 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_Emergency\_Survival\_Kit\_9\_3 | Example\_Emergency\_Survival\_Kit.pdf |
+| Example\_GPS\_Watch\_1\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_10\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_10\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_10\_2 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_11\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_11\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_12\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_12\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_13\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_13\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_2\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_2\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_2\_2 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_2\_3 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_2\_4 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_2\_5 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_2\_6 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_2\_7 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_3\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_4\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_4\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_4\_2 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_4\_3 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_5\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_5\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_5\_2 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_5\_3 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_6\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_7\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_7\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_7\_2 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_7\_3 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_8\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_8\_1 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_8\_2 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_9\_0 | Example\_GPS\_Watch.pdf |
+| Example\_GPS\_Watch\_9\_1 | Example\_GPS\_Watch.pdf |
+
+</details>
+
+ayyo
+## HttpContext and DbContext thread safety
+### HttpContext
+`HttpContext` is not thread-safe. It represents the current HTTP request and is designed to be used within a single request execution pipeline. 
+It's injected via dependency injection or a cascading parameter to be accessed within the scope of a specific request.
+
+The main thread-safety concerns with `HttpContext`:
+- It's tied to a specific request and shouldn't be shared across requests
+- It shouldn't be accessed from background threads after the request completes
+- It's not designed for concurrent access from multiple threads
+
+### DbContext
+`DbContext` (like `IngestionCacheDbContext` in this app) is also not thread-safe. 
+It's designed to represent a unit of work with the database and isn't meant for concurrent use. 
+Specific issues include:
+- Cannot be used concurrently by multiple threads
+- Should typically have a scoped lifetime (created per request)
+- Change tracking and identity resolution mechanisms aren't thread-safe
+
+The `IngestionCacheDbContext` is registered with:
+```csharp
+builder.Services.AddDbContext<IngestionCacheDbContext>(options => options.UseSqlite("Data Source=ingestioncache.db"));
+```
+
+Which uses the default scoped lifetime to ensure each request gets its own isolated instance.
 

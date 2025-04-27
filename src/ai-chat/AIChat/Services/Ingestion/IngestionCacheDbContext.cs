@@ -24,7 +24,11 @@ public class IngestionCacheDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.Entity<IngestedDocument>().HasMany(d => d.Records).WithOne().HasForeignKey(r => r.DocumentId).OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<IngestedDocument>()
+            .HasMany(d => d.Records)
+            .WithOne()
+            .HasForeignKey(r => r.DocumentId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 

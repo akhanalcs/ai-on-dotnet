@@ -22,15 +22,22 @@ var openAIOptions = new OpenAIClientOptions()
 
 var ghModelsClient = new OpenAIClient(credential, openAIOptions);
 var chatClient = ghModelsClient.GetChatClient("gpt-4o-mini").AsIChatClient();
+
+// Embeddings are vector representations of text that capture semantic meaning, allowing for similarity comparisons
+// between different pieces of text. The embedding generator converts text into these numerical vectors.
+
+// The system ingests documents (like PDFs), converts their content to embeddings, stores them, and then can find
+// semantically related content when needed.
 var embeddingGenerator = ghModelsClient.GetEmbeddingClient("text-embedding-3-small").AsIEmbeddingGenerator();
 
 var vectorStore = new JsonVectorStore(Path.Combine(AppContext.BaseDirectory, "vector-store"));
 
 builder.Services.AddSingleton<IVectorStore>(vectorStore);
+
 // Note: Scoped services are created once per client request, not per user
 // Services should typically have the same or shorter lifetime than their dependencies.
 //   Imagine a bucket. You should put things that are either the same size or smaller than it in the bucket.
-builder.Services.AddScoped<DataIngestor>();
+builder.Services.AddScoped<DataIngestor>(); // It's registered as scoped because it uses DbContext.
 builder.Services.AddSingleton<SemanticSearch>();
 builder.Services.AddChatClient(chatClient).UseFunctionInvocation().UseLogging();
 builder.Services.AddEmbeddingGenerator(embeddingGenerator);
