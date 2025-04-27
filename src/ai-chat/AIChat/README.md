@@ -309,7 +309,16 @@ From Records
 
 </details>
 
-ayyo
+The record Ids relate to the keys in vector embeddings of the documents. For eg:
+```
+<stuffs here>..."Example_Emergency_Survival_Kit_2_0":{"Key":"Example_Emergency_Survival_Kit_2_0","FileName":"Example_Emergency_Survival_Kit.pdf",
+"PageNumber":2,"Text":"(c) Life Guard X\n\n2\n\n\n\n1. Introduction . . . 4 2. Getting Started. . . . . 5 2.1 Unboxing . . . 5 2.2 Familiarizing 
+Yourself with the Kit. . . 5 2.3 Understanding the Labels .","Vector":[0.036254153,0.027884087,<more stuffs here>
+"Example_Emergency_Survival_Kit_2_1":{"Key":"Example_Emergency_Survival_Kit_2_1","FileName":"Example_Emergency_Survival_Kit.pdf","PageNumber":2,
+"Text":". . . 5 2.4 Storing the Kit . . . 5 3. First Aid Supplies . . . 6 3.1 Bandages and Dressings . . . 6 3.2 Antiseptics and Ointments . . ."
+,"Vector":[-0.00469975,<more stuffs here>
+```
+
 ## HttpContext and DbContext thread safety
 ### HttpContext
 `HttpContext` is not thread-safe. It represents the current HTTP request and is designed to be used within a single request execution pipeline. 
