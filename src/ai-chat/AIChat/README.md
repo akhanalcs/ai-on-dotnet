@@ -330,7 +330,7 @@ Yourself with the Kit. . . 5 2.3 Understanding the Labels .","Vector":[0.0362541
 ,"Vector":[-0.00469975,<more stuffs here>
 ```
 It's mapped to [`SemanticSearchRecord.cs`](Services/SemanticSearchRecord.cs).
-If you count the number of floating point numbers in the vector, it should be 1536. Proof: 
+If you count the number of floating point numbers in the vector, it should be 1536. Proof: https://dotnetfiddle.net/Vqft5f
 
 ## HttpContext and DbContext thread safety
 ### HttpContext

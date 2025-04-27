@@ -15,7 +15,8 @@ public class SemanticSearchRecord
 
     [VectorStoreRecordData]
     public required string Text { get; set; }
-
-    [VectorStoreRecordVector(1536, DistanceFunction.CosineSimilarity)] // 1536 is the default vector size for the OpenAI text-embedding-3-small model
+    // https://dotnetfiddle.net/Vqft5f
+    // 1536 is the default vector size for the OpenAI text-embedding-3-small model
+    [VectorStoreRecordVector(1536, DistanceFunction.CosineSimilarity)]
     public ReadOnlyMemory<float> Vector { get; set; }
 }
