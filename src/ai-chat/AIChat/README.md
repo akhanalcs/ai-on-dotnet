@@ -2,6 +2,7 @@
 This project is an AI chat application that demonstrates how to chat with custom data using an AI language model.  
 
 ## Resources
+- Watch this video first: [What is a Vector Database? Powering Semantic Search & AI Applications](https://youtu.be/gl1r1XV0SLw?si=o4pQks2d3kR9XLIo)
 - Watch the video and follow along with docs below:
     - [ASP.NET Community Standup - AI-powered Blazor web apps with the new .NET AI template](https://www.youtube.com/live/9cwSOyavdSI?si=ddZfiNBftdWDEHjv)
     - [Create a .NET AI app to chat with custom data using the AI app template extensions](https://learn.microsoft.com/en-us/dotnet/ai/quickstarts/ai-templates?tabs=dotnet-cli%2Cconfigure-visual-studio&pivots=github-models)
@@ -73,7 +74,17 @@ Template options:
     - The service that provides the AI model. For example, OpenAI, GitHub Models, Azure OpenAI, etc.
 2. Vector store (`--vector-store`)
     - Place to store information that can be retrieved by the AI system using Semantic search.
-
+    - They are a place to store unstructured data (like text, images, audio) and retrieve it quickly and semantically.
+3. Vector Embedding (VEctor = Vector + Embedding) (This is AI Generated definition)
+    - A numerical representation of a piece of text that captures its meaning and context. 
+      - Similar items are placed closer together in the vector space, while dissimilar items are placed further apart.
+    - It allows the AI system to understand and compare different pieces of text based on their semantic similarity.
+4. RAG (Retrieval-Augmented Generation)
+    - A technique that combines retrieval of relevant information from a vector store with the generation of text using an AI model.
+    - Vector databases are a core feature of something called RAG (Retrieval-Augmented Generation). 
+      - These databases store chunks of documents, articles and knowledge bases as embeddings.
+      - When a user asks a question, the AI system retrieves the most relevant chunks from the vector database by comparing vector similarity and feeds those to a LLM to generate a more accurate and contextually relevant response.
+   
 ## Create .NET AI app
 ```bash
 $ cd src/ai-chat
@@ -318,6 +329,8 @@ Yourself with the Kit. . . 5 2.3 Understanding the Labels .","Vector":[0.0362541
 "Text":". . . 5 2.4 Storing the Kit . . . 5 3. First Aid Supplies . . . 6 3.1 Bandages and Dressings . . . 6 3.2 Antiseptics and Ointments . . ."
 ,"Vector":[-0.00469975,<more stuffs here>
 ```
+It's mapped to [`SemanticSearchRecord.cs`](Services/SemanticSearchRecord.cs).
+If you count the number of floating point numbers in the vector, it should be 1536. Proof: 
 
 ## HttpContext and DbContext thread safety
 ### HttpContext
