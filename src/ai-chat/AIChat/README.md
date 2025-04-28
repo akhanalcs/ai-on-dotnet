@@ -423,7 +423,7 @@ https://learn.microsoft.com/en-us/dotnet/aspire/get-started/add-aspire-existing-
   <img alt="image" src="screenshots/apphost-play.png" width="250">
 - Check out the dashboard
 
-  <img alt="image" src="screenshots/aspire-dashboard" width="1000">
+  <img alt="image" src="screenshots/aspire-dashboard.png" width="1100">
 - Check out the application logs
 
   <img alt="image" src="screenshots/app-console-logs.png" width="750">
