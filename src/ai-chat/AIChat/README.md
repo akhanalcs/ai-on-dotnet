@@ -421,6 +421,12 @@ https://learn.microsoft.com/en-us/dotnet/aspire/get-started/add-aspire-existing-
 - Start the `AIChat.AppHost:https` project.
 
   <img alt="image" src="screenshots/apphost-play.png" width="250">
+- Check out the dashboard
+
+  <img alt="image" src="screenshots/aspire-dashboard" width="1000">
+- Check out the application logs
+
+  <img alt="image" src="screenshots/app-console-logs.png" width="750">
 
 ## Use Real Vector Database
 
