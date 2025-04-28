@@ -350,16 +350,79 @@ Yourself with the Kit. . . 5 2.3 Understanding the Labels .","Vector":[0.0362541
 It's mapped to [`SemanticSearchRecord.cs`](Services/SemanticSearchRecord.cs).
 If you count the number of floating point numbers in the vector, it should be 1536. Proof: https://dotnetfiddle.net/Vqft5f
 
-## Use real vector database
+## Add .NET Aspire to your solution
+https://learn.microsoft.com/en-us/dotnet/aspire/get-started/add-aspire-existing-app?tabs=unix&pivots=dotnet-cli
+
 - `Cmd + ,` to open Rider settings > Plugins > Marketplace > Search for [`.NET Aspire`](https://plugins.jetbrains.com/plugin/23289--net-aspire) > Install it. (It was already installed for me).
 - Check that you have Aspire templates installed:
-```bash
-$ dotnet new list aspire
-```
+  ```bash
+  $ dotnet new list aspire
+  ```
 - If you don't have .NET Aspire templates installed, install it. [Reference](https://learn.microsoft.com/en-us/dotnet/aspire/get-started/build-your-first-aspire-app?pivots=dotnet-cli).
-```bash
-dotnet new install Aspire.ProjectTemplates 
-```
+  ```bash
+  dotnet new install Aspire.ProjectTemplates 
+  ```
+- Go to the solution level
+  ```bash
+  $ cd ..
+  $ pwd
+  /Users/ashishkhanal/RiderProjects/ai-on-dotnet/src/ai-chat
+  $ ls
+  AIChat                          ai-chat.sln                     identifier.sqlite
+  Data Source=ingestioncache.db   ai-chat.sln.DotSettings.user    ingestioncache.db
+  ```
+- Create Aspire AppHost project
+  ```bash
+  $ dotnet new aspire-apphost -o AIChat.AppHost
+  # Add it to solution
+  $ dotnet sln add AIChat.AppHost --solution-folder src
+  Project `AIChat.AppHost/AIChat.AppHost.csproj` added to the solution.
+  ```
+- Add `AIChat` project as a reference to the `AIChat.AppHost` project (`AIChat.AppHost` project uses `AIChat` project).
+  ```bash
+  $ dotnet add AIChat.AppHost reference AIChat
+  Reference `..\AIChat\AIChat.csproj` added to the project.
+  ```
+  ```xml
+  <!--This shows up in AIChat.AppHost project file-->
+  <ItemGroup>
+      <ProjectReference Include="..\AIChat\AIChat.csproj" />
+  </ItemGroup>
+  ```
+- Add ServiceDefaults project
+  ```bash
+  $ dotnet new aspire-servicedefaults -o AIChat.ServiceDefaults
+  # Add it to solution
+  $ dotnet sln add AIChat.ServiceDefaults --solution-folder src
+  ```
+- `AIChat` project needs to reference `AIChat.ServiceDefaults` project. 
+  So add `AIChat.ServiceDefaults` project as a reference to `AIChat` project (`AIChat` project uses `AIChat.ServiceDefaults` project).
+  ```bash
+  $ dotnet add AIChat reference AIChat.ServiceDefaults
+  Reference `..\AIChat.ServiceDefaults\AIChat.ServiceDefaults.csproj` added to the project.
+  ```
+  ```xml
+  <!--This shows up in AIChat project file-->
+  <ItemGroup>
+      <ProjectReference Include="..\AIChat.ServiceDefaults\AIChat.ServiceDefaults.csproj" />
+  </ItemGroup>
+  ```
+- Update `AIChat/Program.cs` to use Service defaults right after builder creation:
+  ```csharp
+  var builder = WebApplication.CreateBuilder(args);
+  
+  // Add this guy 👇
+  builder.AddServiceDefaults();
+  ```
+- Update `AIChat.AppHost/Program.cs` to add `AIChat` project to the orchestrator:
+  ```csharp
+  builder.AddProject<Projects.AIChat>("my-ai-chat");
+  ```
+- Start the `AIChat.AppHost:https` project.
+
+  <img alt="image" src="screenshots/apphost-play.png" width="250">
+
+## Use Real Vector Database
 
 ## HttpContext and DbContext thread safety
 ### HttpContext

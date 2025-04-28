@@ -8,6 +8,10 @@ using OpenAI;
 using System.ClientModel;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Aspire stuffs
+builder.AddServiceDefaults();
+
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
 // You will need to set the endpoint and key to your own values
