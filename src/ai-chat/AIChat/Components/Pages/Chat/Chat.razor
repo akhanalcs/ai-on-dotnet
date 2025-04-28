@@ -1,5 +1,7 @@
 ﻿@page "/"
 @using System.ComponentModel
+@* This comes from a new .NET library called Microsoft.Extensions.AI *@
+@* This is a standard representation for a language model service (AI services). Same way we have ILogger, IServiceProvider etc. *@
 @inject IChatClient ChatClient
 @inject NavigationManager Nav
 @inject SemanticSearch Search
@@ -50,6 +52,7 @@
     protected override void OnInitialized()
     {
         messages.Add(new(ChatRole.System, SystemPrompt));
+        // This is basically us advertising to the AI that we have a search tool available
         chatOptions.Tools = [AIFunctionFactory.Create(SearchAsync)];
     }
 
@@ -66,6 +69,15 @@
         var responseText = new TextContent("");
         currentResponseMessage = new ChatMessage(ChatRole.Assistant, [responseText]);
         currentResponseCancellation = new();
+        
+        // Call the AI service to get a response using the chat client
+        // [.. messages]: pass all the messages in the conversation so far
+        // When we call this method, we're sending the conversation to the AI service
+        // And it might reply initially to say "I want you to do a search for this phrase"
+        // And that automatically calls our SearchAsync method, gets the return value and then gives it to the AI
+        // to give another chance to respond based on that result
+        // Eventually the response comes back.
+        // This all happens inside the GetStreamingResponseAsync method
         await foreach (var update in ChatClient.GetStreamingResponseAsync([.. messages], chatOptions, currentResponseCancellation.Token))
         {
             messages.AddMessages(update, filter: c => c is not TextContent);
@@ -100,12 +112,17 @@
         await chatInput!.FocusAsync();
     }
 
+    // In order to search the data that we ingested, we're making this function available to the AI 
     [Description("Searches for information using a phrase or keyword")]
     private async Task<IEnumerable<string>> SearchAsync(
         [Description("The phrase to search for.")] string searchPhrase,
         [Description("If possible, specify the filename to search that file only. If not provided or empty, the search includes all files.")] string? filenameFilter = null)
     {
+        // Set breakpoint here and run it and see to learn. Look at 26 minute mark in the ASP.NET Community standup video.
         await InvokeAsync(StateHasChanged);
+        // Perform semantic search through the data we ingested
+        // And that becomes available to the AI to answer based on.
+        // This pattern is called Retrieval-Augmented Generation (RAG)
         var results = await Search.SearchAsync(searchPhrase, filenameFilter, maxResults: 5);
         return results.Select(result =>
             $"<result filename=\"{result.FileName}\" page_number=\"{result.PageNumber}\">{result.Text}</result>");

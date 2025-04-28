@@ -1,6 +1,10 @@
 # AI Chat with Custom Data
 This project is an AI chat application that demonstrates how to chat with custom data using an AI language model.  
 
+It's a RAG (Retrieval-Augmented Generation) application that uses a vector database to store and retrieve information.
+Simply put, LLMs can't access your company's information directly. RAG lets you share relevant documents with the LLM, 
+so it can answer your questions using your own data. [Short summary](https://youtube.com/shorts/xS55duPS-Pw?si=9iAMDJ593p34ZAG6).
+
 ## Resources
 - Watch this video first: [What is a Vector Database? Powering Semantic Search & AI Applications](https://youtu.be/gl1r1XV0SLw?si=o4pQks2d3kR9XLIo)
 - Watch the video and follow along with docs below:
@@ -17,6 +21,18 @@ Success: Microsoft.Extensions.AI.Templates::9.4.0-preview.2.25216.9 installed th
 Template Name    Short Name  Language  Tags                            
 ---------------  ----------  --------  --------------------------------
 AI Chat Web App  aichatweb   [C#]      Common/AI/Web/Blazor/.NET Aspire
+```
+
+Check that it was installed successfully:
+```bash
+$ dotnet new list
+These templates matched your input: 
+
+Template Name                                 Short Name                  Language    Tags                              
+--------------------------------------------  --------------------------  ----------  ----------------------------------
+AI Chat Web App                               aichatweb                   [C#]        Common/AI/Web/Blazor/.NET Aspire  
+API Controller                                apicontroller               [C#]        Web/ASP.NET
+... and so on
 ```
 
 Check out the options using help flag.
@@ -75,10 +91,12 @@ Template options:
 2. Vector store (`--vector-store`)
     - Place to store information that can be retrieved by the AI system using Semantic search.
     - They are a place to store unstructured data (like text, images, audio) and retrieve it quickly and semantically.
+    - [56:38](https://www.youtube.com/live/9cwSOyavdSI?si=0i5lm7ovruX5KxLB&t=3398): Vector databases like Qdrant understand the landscape of the data you fed to it (embeddings) and organizing it into different thematic groups.
 3. Vector Embedding (VEctor = Vector + Embedding) (This is AI Generated definition)
     - A numerical representation of a piece of text that captures its meaning and context. 
       - Similar items are placed closer together in the vector space, while dissimilar items are placed further apart.
     - It allows the AI system to understand and compare different pieces of text based on their semantic similarity.
+    - More info: https://milvus.io/intro
 4. RAG (Retrieval-Augmented Generation)
     - A technique that combines retrieval of relevant information from a vector store with the generation of text using an AI model.
     - Vector databases are a core feature of something called RAG (Retrieval-Augmented Generation). 
@@ -331,6 +349,17 @@ Yourself with the Kit. . . 5 2.3 Understanding the Labels .","Vector":[0.0362541
 ```
 It's mapped to [`SemanticSearchRecord.cs`](Services/SemanticSearchRecord.cs).
 If you count the number of floating point numbers in the vector, it should be 1536. Proof: https://dotnetfiddle.net/Vqft5f
+
+## Use real vector database
+- `Cmd + ,` to open Rider settings > Plugins > Marketplace > Search for [`.NET Aspire`](https://plugins.jetbrains.com/plugin/23289--net-aspire) > Install it. (It was already installed for me).
+- Check that you have Aspire templates installed:
+```bash
+$ dotnet new list aspire
+```
+- If you don't have .NET Aspire templates installed, install it. [Reference](https://learn.microsoft.com/en-us/dotnet/aspire/get-started/build-your-first-aspire-app?pivots=dotnet-cli).
+```bash
+dotnet new install Aspire.ProjectTemplates 
+```
 
 ## HttpContext and DbContext thread safety
 ### HttpContext

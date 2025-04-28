@@ -67,6 +67,8 @@ app.MapRazorComponents<App>()
 // other sources by implementing IIngestionSource.
 // Important: ensure that any content you ingest is trusted, as it may be reflected back
 // to users or could be a source of prompt injection risk.
+
+// In real world, this happens in the background, e.g. in a hosted service.
 await DataIngestor.IngestDataAsync(
     app.Services,
     new PDFDirectorySource(Path.Combine(builder.Environment.WebRootPath, "Data")));

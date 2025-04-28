@@ -12,6 +12,7 @@ public class PDFDirectorySource(string sourceDirectory) : IIngestionSource
 {
     public static string SourceFileId(string path) => Path.GetFileName(path);
 
+    // Just a unique identifier for this source
     public string SourceId => $"{nameof(PDFDirectorySource)}:{sourceDirectory}";
 
     public async Task<IEnumerable<IngestedDocument>> GetNewOrModifiedDocumentsAsync(IQueryable<IngestedDocument> existingDocuments)
@@ -51,6 +52,9 @@ public class PDFDirectorySource(string sourceDirectory) : IIngestionSource
     public async Task<IEnumerable<SemanticSearchRecord>> CreateRecordsForDocumentAsync(IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator, string documentId)
     {
         using var pdf = PdfDocument.Open(Path.Combine(sourceDirectory, documentId));
+        // Split the document into small pieces because we shouldn't put complete documents into the vector store
+        // because that won't perform well for semantic search. And you'd use tons of tokens every time you
+        // try to include that in the context of what you're searching for.
         var paragraphs = pdf.GetPages().SelectMany(GetPageParagraphs).ToList();
 
         var embeddings = await embeddingGenerator.GenerateAsync(paragraphs.Select(c => c.Text));
@@ -74,6 +78,9 @@ public class PDFDirectorySource(string sourceDirectory) : IIngestionSource
             textBlocks.Select(t => t.Text.ReplaceLineEndings(" ")));
 
 #pragma warning disable SKEXP0050 // Type is for evaluation purposes only
+        // TextChunker is a utility class that splits text into smaller chunks (split on paragraph boundaries usually)
+        // 200 characters is a reasonable size for semantic search
+        // It's experimental, so it needs that warning supression
         return TextChunker.SplitPlainTextParagraphs([pageText], 200)
             .Select((text, index) => (pdfPage.Number, index, text));
 #pragma warning restore SKEXP0050 // Type is for evaluation purposes only
