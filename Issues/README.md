@@ -1,43 +1,44 @@
-Oracle Migration Issue: BOOLEAN Column and Default Value Not Supported, Dashboard Broken
+**Title:**  
+Dashboard Date/Time Incorrect
 
 **Description:**  
-When upgrading TickerQ to v9.2.2 and running EF Core migrations against Oracle, the migration generator creates a column with type `BOOLEAN` and default value `True`. This is not supported by Oracle, which only allows `NUMBER(1)` or `CHAR(1)` for boolean-like columns and expects `DEFAULT 1` or `DEFAULT 'Y'`.
+The dashboard is displaying incorrect dates for job executions. My server is in EST, my local machine is in EST, and I have set EST in the config, but the dashboard shows job dates as 17.03.2026 when the actual date today is 3/18/2026. This is a day late and does not match the expected time zone.
 
-**Migration Snippet:**
-```csharp
-protected override void Up(MigrationBuilder migrationBuilder)
+```cs
+builder.Services.AddTickerQ(options =>
 {
-    migrationBuilder.AddColumn<bool>(
-        name: "IsEnabled",
-        schema: "MY_APP_SCHEMA",
-        table: "SCHEDULER_CRONTICKERS",
-        type: "BOOLEAN",
-        nullable: false,
-        defaultValue: true);
-}
-```
-**Generated SQL:**
-```sql
-ALTER TABLE "MY_APP_SCHEMA"."SCHEDULER_CRONTICKERS" ADD "IsEnabled" BOOLEAN DEFAULT True NOT NULL
-```
-**Oracle Error:**
-```
-ORA-00904: "TRUE": invalid identifier
+    options.ConfigureScheduler(schedulerOptions =>
+    {
+        schedulerOptions.SchedulerTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+    //... and so on
 ```
 
-**Impact:**  
-- The dashboard shows 0 cron jobs when there are actually jobs present.
-- Disabling a cron job throws HTTP 500 errors.
-- The app is broken for Oracle users after this migration.
+Additionally, the date format shown is DD.MM.YYYY, which is not standard for US users. I would prefer the American date format MM/DD/YYYY.
 
-**Request:**  
-- Ensure migrations generate valid Oracle SQL for boolean columns.
-- Document the expected column type and value for Oracle users, and update the dashboard/backend to handle `NUMBER(1)` or `CHAR(1)` as boolean.
+**Screenshot:**  
+![Dashboard Date Issue](https://user-images.githubusercontent.com/your-screenshot-link.png)  
+*(See attached screenshot: chart shows 17.03.2026, but system date is 3/18/2026)*
 
 **Environment:**  
-- TickerQ v9.2.2
-- Oracle Database
-- EF Core
+- Server Timezone: EST  
+- Local Machine Timezone: EST  
+- Config Timezone: EST  
+- TickerQ Dashboard v9.1.1  
+- .NET 9
 
-**Screenshots:**  
 
+--===========
+**Title:**  
+Dashboard Enhancement: Filter and View Jobs by Status
+
+**Description:**  
+Currently, the dashboard displays counts for job statuses like "Done", "DueDone", "Failed", etc., but there is no way to view which specific jobs failed or succeeded. To find failed jobs, I have to click into each cron job individually, which is cumbersome when there are many jobs.
+
+It would be much more useful if the dashboard provided a way to filter and view jobs based on their status. For example, a user should be able to quickly see a list of all failed jobs, all completed jobs, etc., from the dashboard based on their status.
+
+**Request:**  
+- Add a feature to filter and display jobs by status (e.g., Failed, Done, DueDone) in the dashboard.
+- Allow users to easily identify which jobs are in each status without having to click into each cron job.
+
+**Value:**  
+This enhancement would make it significantly easier to monitor, troubleshoot, and manage jobs, especially in environments with many cron jobs.
