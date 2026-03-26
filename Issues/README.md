@@ -1,45 +1,68 @@
-**Title:**  
-Dashboard Date/Time Incorrect
+## Update & Solution
 
-**Description:**  
-The dashboard is displaying incorrect dates for job executions. My server is in EST, my local machine is in EST, and I have set EST in the config, but the dashboard shows job dates as 17.03.2026 when the actual date today is 3/18/2026. This is a day late and does not match the expected time zone.
+I was able to achieve the desired behavior by combining two key approaches:
 
-```cs
+1. **Always call** `options.IgnoreSeedDefinedCronTickers();`  
+   This is crucial! If you don’t include this line, TickerQ will automatically seed (and overwrite) cron tickers in the database even if you’ve already configured them via the dashboard. For example, when I commented out `[TickerFunction]` attribute on a function, it wiped out my custom cron configuration that I had setup from the dashboard. 
+
+2. **Register the TickerQ operational store only in non-local environments**  
+   In local development, I skip calling `options.AddOperationalStore(...)`, so TickerQ doesn’t touch the shared dev database. This lets me manually queue jobs for testing/debugging, while still using my app’s real connection string (via Dapper) for business logic. In other environments, the operational store is registered as usual.
+
+**This approach gives me:**
+- Full control over when/what jobs are queued in local development (no accidental pollution or overwrites in the shared DB).
+- The ability to use the real database for my app logic, but keep TickerQ’s job state isolated.
+- No more confusion or lost configuration in the cron ticker tables.
+
+**This is also helpful for teams using EF Core for all DB operations:**  
+You can keep TickerQ’s context isolated to the shared DB, but use your own AppDbContext for everything else, even in local development.
+
+---
+
+### Sample Code (for .NET 9, Oracle, TickerQ 9.1):
+
+```csharp
+var environment = builder.Environment.EnvironmentName;
+var conStr = builder.Configuration.ConnectionString("MY_CONN_STRING");
+
 builder.Services.AddTickerQ(options =>
 {
+    // Register global exception handler for all job execution exceptions
+    options.SetExceptionHandler<JobsExceptionHandler>();
+
     options.ConfigureScheduler(schedulerOptions =>
     {
+        schedulerOptions.MaxConcurrency = 1;  // Maximum number of concurrent worker threads.  Match to server's logical processor count. I got it by running this in command: "wmic cpu get NumberOfCores,NumberOfLogicalProcessors"
         schedulerOptions.SchedulerTimeZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
-    //... and so on
+        schedulerOptions.IdleWorkerTimeOut = TimeSpan.FromMinutes(1); // Time before idle workers are shut down. Shutdown quickly.
+        schedulerOptions.FallbackIntervalChecker = TimeSpan.FromMinutes(2); // Check less frequently
+    });
+
+    // CRUCIAL: Prevents TickerQ from seeding/overwriting cron tickers in DB
+    options.IgnoreSeedDefinedCronTickers();
+
+    // Only register the operational store in non-local environments
+    if (!environment.Equals("Local", StringComparison.OrdinalIgnoreCase))
+    {
+        options.AddOperationalStore(efOptions =>
+        {
+            efOptions.UseTickerQDbContext<CustomTickerQDbContext>(optionsBuilder =>
+            {
+                optionsBuilder.UseOracle(conStr, oracleOptions =>
+                {
+                    oracleOptions.MigrationsHistoryTable("MY_SCHEDULER_EFMIGRATIONSHISTORY", "MY_SCHEMA");
+                });
+            });
+            efOptions.SetDbContextPoolSize(6);  // Match Max Pool Size in connection string
+        });
+    }
+
+    options.AddDashboard(dashboardOptions =>
+    {
+        dashboardOptions.SetBasePath("/tickerq/dashboard");
+        dashboardOptions.WithNoAuth();
+    });
+});
 ```
 
-Additionally, the date format shown is DD.MM.YYYY, which is not standard for US users. I would prefer the American date format MM/DD/YYYY.
-
-**Screenshot:**  
-![Dashboard Date Issue](https://user-images.githubusercontent.com/your-screenshot-link.png)  
-*(See attached screenshot: chart shows 17.03.2026, but system date is 3/18/2026)*
-
-**Environment:**  
-- Server Timezone: EST  
-- Local Machine Timezone: EST  
-- Config Timezone: EST  
-- TickerQ Dashboard v9.1.1  
-- .NET 9
-
-
---===========
-**Title:**  
-Dashboard Enhancement: Filter and View Jobs by Status
-
-**Description:**  
-Currently, the dashboard displays counts for job statuses like "Done", "DueDone", "Failed", etc., but there is no way to view which specific jobs failed or succeeded. To find failed jobs, I have to click into each cron job individually, which is cumbersome when there are many jobs.
-
-It would be much more useful if the dashboard provided a way to filter and view jobs based on their status. For example, a user should be able to quickly see a list of all failed jobs, all completed jobs, etc., from the dashboard based on their status.
-
-**Request:**  
-- Add a feature to filter and display jobs by status (e.g., Failed, Done, DueDone) in the dashboard.
-- Allow users to easily identify which jobs are in each status without having to click into each cron job.
-
-**Value:**  
-This enhancement would make it significantly easier to monitor, troubleshoot, and manage jobs, especially in environments with many cron jobs.
+Thanks for the pointers—this workflow should help others in similar situations!
 
