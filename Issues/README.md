@@ -66,3 +66,44 @@ builder.Services.AddTickerQ(options =>
 
 Thanks for the pointers—this workflow should help others in similar situations!
 
+---
+
+The tickerq 9.2.5 migration is not working.
+
+```sql
+DECLARE
+    v_Count INTEGER;
+BEGIN
+SELECT COUNT(*) INTO v_Count FROM "MY_SCHEMA"."MY_SCHEDULER_EFMIGRATIONSHISTORY" WHERE "MigrationId" = N'20260330163420_TQNet925Upgrade';
+IF v_Count = 0 THEN
+
+    EXECUTE IMMEDIATE 
+    'ALTER TABLE "MY_SCHEMA"."MY_SCHEDULER_CRONTICKERS" ADD "IsEnabled" BOOLEAN DEFAULT False NOT NULL'
+    ;
+ END IF;
+END;
+
+/
+
+DECLARE
+    v_Count INTEGER;
+BEGIN
+SELECT COUNT(*) INTO v_Count FROM "MY_SCHEMA"."MY_SCHEDULER_EFMIGRATIONSHISTORY" WHERE "MigrationId" = N'20260330163420_TQNet925Upgrade';
+IF v_Count = 0 THEN
+
+    EXECUTE IMMEDIATE 
+    'INSERT INTO "MY_SCHEMA"."MY_SCHEDULER_EFMIGRATIONSHISTORY" ("MigrationId", "ProductVersion")
+    VALUES (N''20260330163420_TQNet925Upgrade'', N''9.0.13'')'
+    ;
+ END IF;
+END;
+
+/
+```
+> dotnet ef migrations add TQNet925Upgrade -c TickerQDbContext -o Data\Migrations
+
+> dotnet ef migrations script --idempotent 20260313170226_TQNet9Upgrade 20260330163420_TQNet925Upgrade -c TickerQDbContext -o Data\MigrationScripts\TQNet925Upgrade.sql
+
+
+
+
