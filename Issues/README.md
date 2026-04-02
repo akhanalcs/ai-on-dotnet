@@ -106,4 +106,65 @@ END;
 
 
 
+----
+
+**Title:**  
+Source generator fails to resolve input types with namespace for new jobs – urgent production blocker
+
+**Body:**
+
+Hi TickerQ team,
+
+We are facing a critical issue with the TickerQ source generator that is blocking our production deployment.
+
+**Background:**  
+We have several jobs in our scheduler project (let’s call it `My.Scheduler`). Until recently, everything was working fine. For example, we have a job like this:
+
+```csharp
+namespace My.Scheduler.Jobs.DataCopy.TempForecastsSync;
+
+public class TempForecastsSyncJobInput
+{
+    public int LookbackDaysFromMaxDate { get; set; }
+}
+
+public class TempForecastsSyncJob
+{
+    [TickerFunction(functionName: nameof(SyncFetchedTempForecasts))]
+    public async Task SyncFetchedTempForecasts(TickerFunctionContext<TempForecastsSyncJobInput> context, CancellationToken cancellationToken)
+    {
+        // ...
+    }
+}
+```
+
+**Problem:**  
+After adding new jobs and new input types (like `TempForecastsSyncJobInput`), the build started failing with errors in the generated `TickerQInstanceFactory.g.cs` file. The errors look like this:
+
+```
+error CS0246: The type or namespace name 'TempForecastsSyncJobInput' could not be found (are you missing a using directive or an assembly reference?)
+error CS1503: Argument 1: cannot convert from 'TickerQ.Utilities.Base.TickerFunctionContext<TempForecastsSyncJobInput>' to 'TickerQ.Utilities.Base.TickerFunctionContext<My.Scheduler.Jobs.DataCopy.TempForecastsSync.TempForecastsSyncJobInput>'
+```
+
+The generated code is referencing `TempForecastsSyncJobInput` without the namespace, even though the class is defined in a namespace. This only started happening after adding new jobs and input types. Previously, all jobs (with similar structure) worked fine.
+
+**What I’ve tried:**
+- Cleaned and rebuilt the solution
+- Deleted all `bin` and `obj` folders
+- Verified there are no duplicate class names
+
+**Impact:**  
+This is a major blocker for us. The only workaround is to remove the namespace from the input object, which is not acceptable for code organization and maintainability. This issue is very frustrating, as it was working fine for all other jobs until we added new ones.
+
+**Questions:**
+- Why did this work previously, but now fails for new jobs?
+- Is there a workaround for this namespace resolution issue in the source generator?
+- Is there a way to force the generator to use fully qualified type names for input types?
+
+**Urgency:**  
+We are going to production next week and this issue is wasting a lot of time. Any urgent help or workaround would be greatly appreciated!
+
+Thank you!
+
+
 
