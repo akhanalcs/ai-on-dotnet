@@ -11,6 +11,119 @@ so it can answer your questions using your own data. [Short summary](https://you
     - [ASP.NET Community Standup - AI-powered Blazor web apps with the new .NET AI template](https://www.youtube.com/live/9cwSOyavdSI?si=ddZfiNBftdWDEHjv)
     - [Create a .NET AI app to chat with custom data using the AI app template extensions](https://learn.microsoft.com/en-us/dotnet/ai/quickstarts/ai-templates?tabs=dotnet-cli%2Cconfigure-visual-studio&pivots=github-models)
 
+## Basics
+
+### `VectorStoreKey`, `VectorStoreData` and `VectorStoreVector`
+Reference: https://learn.microsoft.com/en-us/dotnet/ai/vector-stores/how-to/build-vector-search-app?pivots=azure-openai#add-the-app-code
+
+```csharp
+using Microsoft.Extensions.VectorData;
+
+namespace VectorDataAI;
+
+internal class CloudService
+{
+    [VectorStoreKey] # This property uniquely identifies the record.
+    public int Key { get; set; }
+
+    [VectorStoreData] # My normal application data.
+    public string Name { get; set; }
+
+    [VectorStoreData] # My normal application data.
+    public string Description { get; set; }
+
+    # The Vector property stores an embedding, which in this example is an array-like sequence of 384 floating-point numbers.
+    # The attribute says the vector has 384 dimensions and that cosine similarity should be used for comparison.
+    [VectorStoreVector(
+        dimensions: 384,
+        DistanceFunction = DistanceFunction.CosineSimilarity)]
+    public ReadOnlyMemory<float> Vector { get; set; }
+}
+```
+- The attributes tell the `Microsoft.Extensions.VectorData` abstraction how each property should be treated.
+- Notice that `Key`, `Data` and `Vector` are prefixed with `VectorStore`
+- Conceptually, a record might look like below. That array has 384 numbers, but I've truncated it for brevity.
+```
+CloudService
+-----------------------------------------------------------
+Key          1
+Name         "Azure App Service"
+Description  "Build and host web apps in the cloud"
+Vector       [0.018, -0.027, 0.041, ..., 0.009]
+-----------------------------------------------------------
+```
+- A collection might look like this:
+```
+Vector Store Collection
+┌─────┬───────────────────┬─────────────────────────┬───────────────┐
+│ Key │ Name              │ Description             │ Vector        │
+├─────┼───────────────────┼─────────────────────────┼───────────────┤
+│ 1   │ Azure App Service │ Build and host web...   │ [0.1,...]     │
+│ 2   │ Azure Functions   │ Run event-driven code.. │ [0.3,...]     │
+│ 3   │ Azure Storage     │ Store files and data... │ [0.02,...]    │
+└─────┴───────────────────┴─────────────────────────┴───────────────┘
+```
+- The `Description` gets sent to an embedding model to produce a vector representation of the text. The vector is stored in the `Vector` property.
+```csharp
+var service = new CloudService
+{
+    Key = 1,
+    Name = "Azure Storage",
+    Description = "Store files and other data in the cloud"
+};
+
+// Conceptual example
+service.Vector = GenerateEmbedding(service.Description);
+```
+- Basically
+```
+Description
+   │
+   │ embedding model
+   ▼
+"Store files and data..."
+   │
+   ▼
+[0.021, -0.034, 0.118, ...]
+   │
+   ▼
+Vector
+```
+
+### How Vector Search works
+- Let's say the user searches
+```
+"I need somewhere to execute code without managing servers."
+```
+- We generate an embedding for that query too:
+```
+"I need somewhere to execute code without managing servers"
+                  ↓
+             embedding model
+                  ↓
+          [0.14, -0.25, 0.61, ...]
+```
+- Then the vector database compares that vector against stored vectors.
+  - The store uses cosine similarity to determine which stored vector is closest to the query vector.
+```
+                    User query
+                        │
+                        ▼
+                   embedding
+                        │
+                        ▼
+              [0.14, -0.25, ...]
+                        │
+              vector similarity
+             /          │          \
+            ▼           ▼           ▼
+     Azure Function   Storage      SQL
+          0.93         0.42        0.31
+            ▲
+            │
+        Best match
+```
+
 ## Install AI app template
 ```bash
 $ dotnet new install Microsoft.Extensions.AI.Templates
