@@ -10,6 +10,19 @@ so it can answer your questions using your own data. [Short summary](https://you
 - Watch the video and follow along with docs below:
     - [ASP.NET Community Standup - AI-powered Blazor web apps with the new .NET AI template](https://www.youtube.com/live/9cwSOyavdSI?si=ddZfiNBftdWDEHjv)
     - [Create a .NET AI app to chat with custom data using the AI app template extensions](https://learn.microsoft.com/en-us/dotnet/ai/quickstarts/ai-templates?tabs=dotnet-cli%2Cconfigure-visual-studio&pivots=github-models)
+- Check this out:
+  https://github.com/Azure-Samples/ai-chat-aspire-meai-csharp
+
+## Setup
+1. Install tools for Azure Dev in VSCode
+   https://learn.microsoft.com/en-us/azure/azure-functions/functions-develop-vs-code?tabs=node-v4%2Cpython-v2%2Cisolated-process%2Cquick-create&pivots=programming-language-csharp
+2. Install .NET 10 SDK
+3. Install Docker Desktop
+4. Install Azure Developer CLI
+   https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd?tabs=winget-windows%2Cbrew-mac%2Cscript-linux&pivots=os-mac
+   ```bash
+   brew install azure/azd/azd
+   ```
 
 ## Basics
 
