@@ -1,0 +1,34 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2F122DC7-2D5D-40A8-BD85-60336215889F}") = "RagChat.AppHost", "RagChat.AppHost\RagChat.AppHost.csproj", "{2C48AACD-AB4C-4427-9750-C9DAFE3908C6}"
+EndProject
+Project("{2F122DC7-2D5D-40A8-BD85-60336215889F}") = "RagChat.ServiceDefaults", "RagChat.ServiceDefaults\RagChat.ServiceDefaults.csproj", "{CA355354-D1DA-46BB-952B-E26DD952BE4A}"
+EndProject
+Project("{2F122DC7-2D5D-40A8-BD85-60336215889F}") = "RagChat.Web", "RagChat.Web\RagChat.Web.csproj", "{DFDC1542-97BF-442E-9BA9-E674A8B0E213}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2C48AACD-AB4C-4427-9750-C9DAFE3908C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C48AACD-AB4C-4427-9750-C9DAFE3908C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C48AACD-AB4C-4427-9750-C9DAFE3908C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C48AACD-AB4C-4427-9750-C9DAFE3908C6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CA355354-D1DA-46BB-952B-E26DD952BE4A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA355354-D1DA-46BB-952B-E26DD952BE4A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA355354-D1DA-46BB-952B-E26DD952BE4A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA355354-D1DA-46BB-952B-E26DD952BE4A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DFDC1542-97BF-442E-9BA9-E674A8B0E213}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DFDC1542-97BF-442E-9BA9-E674A8B0E213}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DFDC1542-97BF-442E-9BA9-E674A8B0E213}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DFDC1542-97BF-442E-9BA9-E674A8B0E213}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
