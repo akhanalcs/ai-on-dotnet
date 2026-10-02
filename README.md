@@ -231,22 +231,23 @@ Template options:
 ## Create .NET AI app
 Create `src/RagChat` with an AppHost, ServiceDefaults, and Web project.
 ```bash
-$ cd src
-$ pwd
-/Users/ashishkhanal/RiderProjects/rag-on-dotnet/src
 $ cd ~/RiderProjects/rag-on-dotnet
-mkdir src && cd src
-dotnet new aichatweb --Framework net10.0 -n RagChat --provider azureopenai --vector-store qdrant --aspire -C gpt-4o-mini -E text-embedding-3-small
-
-
-# https://learn.microsoft.com/en-us/dotnet/core/tools/dotnet-sln#examples
-# My previous project: https://github.com/akhanalcs/cs-coding-interview/blob/main/README.md#setup-project
-$ dotnet new sln
-$ dotnet sln add AIChat/AIChat.csproj --solution-folder src
-Project `AIChat/AIChat.csproj` added to the solution.
+$ mkdir src && cd src
+$ dotnet new aichatweb --Framework net10.0 -n RagChat --provider azureopenai --vector-store qdrant --aspire -C gpt-4o-mini -E text-embedding-3-small
 ```
 
-Open the solution by right-clicking `ai-chat.sln` > Open Solution.
+### Expected error on first run: mismatched Aspire versions
+Running the AppHost straight after scaffolding crashes:
+```
+System.InvalidOperationException: Step 'provision-openai' depends on unknown step 'create-provisioning-context'
+```
+- **Why:** The template (`Microsoft.Extensions.AI.Templates` 10.10.0-preview) mixes Aspire versions. `Aspire.Hosting.AppHost` is 13.4.6, but the SDK, `Aspire.Hosting.Azure.CognitiveServices` and `Aspire.Hosting.Qdrant` are 13.0.0. The 13.0 Azure package needs a provisioning step that 13.4 hosting no longer has.
+- **Fix:** Put every Aspire package on the same version:
+  ```bash
+  $ cd src/RagChat
+  $ aspire update
+  ```
+- Since Aspire 13, the SDK brings in the AppHost package, so `aspire update` removes the separate `Aspire.Hosting.AppHost` reference.
 
 ## Configure AI model provider (I had chosen `githubmodels`)
 https://docs.github.com/en/github-models/prototyping-with-ai-models#experimenting-with-ai-models-using-the-api
