@@ -292,12 +292,50 @@ What gets created:
 - **Azure:** `openai-<hash>` Its two model deployments, `chat` and `text-embedding-3-small`, are child resources. `openai-roles` is the role assignment that lets my identity call it.
 - **Docker:** `vectordb` (Qdrant) and `markitdown` (PDF → Markdown MCP server).
 
+### View the model deployments
+The Azure portal doesn't list model deployments for an Azure OpenAI resource, and New Foundry only shows Foundry projects.
+- **CLI:**
+  ```bash
+  $ az login --tenant <tenant-id>
+  $ az cognitiveservices account deployment list -g rg-ragchat-dev-eastus2 -n openai-g5rbceqptic4m   --query "[].{name:name, model:properties.model.name, sku:sku.name}" -o table
+  Name                    Model                   Sku
+  ----------------------  ----------------------  --------------
+  chat                    gpt-5-mini              GlobalStandard
+  text-embedding-3-small  text-embedding-3-small  Standard
+  ```
+- **Portal:** rg > `openai-<hash>` > Overview > **Go to Foundry portal** > toggle **New Foundry** off (Classic) > select `openai-<hash>` from the resource dropdown > **Shared resources > Deployments**.
+
+"Deployment" means two things here: rg > **Settings > Deployments** lists Aspire's `openai` and `openai-roles` template runs, not model deployments.
+
+## Deployment type (SKU)
+The SKU decides **where requests are processed** and **how you pay**.
+[Choose the right deployment type.](https://learn.microsoft.com/azure/foundry/foundry-models/concepts/deployment-types#choose-the-right-deployment-type).
+
+- Aspire's `AddDeployment` defaults to `Standard` (regional). Set another tier with `.WithProperties(d => d.SkuName = "...")`.
+
+**My choice:** for learning, **Global Standard** (cheapest). Chat runs on `gpt-5-mini` because it has GlobalStandard quota (500K tokens/min) in my subscription; `gpt-5.4-mini` has 0. For a law firm with client-confidentiality requirements I'd use **Data Zone Standard** or **Standard**, which keep processing in the US.
+
+## Cost
+Pay per token; no hourly charge. Retail prices for eastus2 ([Azure Retail Prices API](https://learn.microsoft.com/rest/api/cost-management/retail-prices/azure-retail-prices)):
+
+| Model (SKU) | Input / 1M tokens | Cached input / 1M | Output / 1M |
+|---|---|---|---|
+| **gpt-5-mini (GlobalStandard)**, what I use | $0.25 | $0.025 | $2.00 |
+| gpt-5.4-mini (DataZoneStandard) | $0.825 | $0.0825 | $4.95 |
+| text-embedding-3-small (Standard) | $0.022 | – | – |
+
+- One chat question ≈ 3K input + 500 output tokens ≈ **$0.002** with gpt-5-mini, so 100 questions ≈ $0.20. (Same question on gpt-5.4-mini DataZone ≈ $0.005.)
+- Embedding both sample docs costs a fraction of a cent.
+- SKU capacity (e.g. 8 = 8K tokens/min) is a **rate limit**, not a charge. Only Provisioned (PTU) SKUs bill per hour.
+- Qdrant and MarkItDown run locally in Docker, so they're free.
+- Actual spend: rg > **Cost analysis** (lags about a day). Set a budget alert under **Cost Management > Budgets**.
+
 ## Troubleshooting: what it took to get it running
 | Symptom | Cause | Fix |
 |---|---|---|
 | VS Code Azure extension shows no subscription | VS Code was signed in with a different Microsoft account | **Azure: Sign In** with the account that owns the subscription |
 | `Compiling ARM template -> Failed to Provision` within milliseconds | No Bicep CLI. Aspire compiles Bicep with `az bicep build`. The VS Code Bicep extension doesn't include the CLI | `brew install azure-cli && az bicep install` |
-| `ServiceModelDeprecated: ... gpt-4o-mini, Version:2024-07-18` | Azure retired that model's Standard SKU on 2026-03-31 | Use `gpt-5.4-mini` in `AppHost.cs` |
+| `ServiceModelDeprecated: ... gpt-4o-mini, Version:2024-07-18` | Azure retired that model's Standard SKU on 2026-03-31 | Use a current model, with a SKU that has quota, in `AppHost.cs`. Now `gpt-5-mini` + `GlobalStandard`; see [Deployment type](#deployment-type-sku) |
 | Still `Azure deployment failed` after fixing the model, with no compile step in the log | Aspire cached the failed deployment in user secrets (`Azure:Deployments:openai:*`) and kept reusing it | Remove those keys: `dotnet user-secrets remove "Azure:Deployments:openai:<key>"` for each one |
 | `Container runtime 'docker' could not be found` | Docker Desktop in **User** mode puts the CLI in `~/.docker/bin`, which apps launched from the Dock (VS Code → Aspire) don't have on their PATH | Docker Desktop > Settings > Advanced > **System** (links the CLI into `/usr/local/bin`) |
 | Firefox: "Not Secure" on the dashboard | Firefox uses its own certificate store, not the macOS Keychain where `aspire certs trust` puts the dev cert | Use Safari/Chrome, or click through. (`dotnet dev-certs https --check --trust` confirms the cert is trusted.) |
@@ -309,6 +347,7 @@ What gets created:
 - **Deployment name ≠ model name.** The app asks for the deployment `chat`, so when a model is retired only `AppHost.cs` changes.
 - **SKU = data residency.** Standard processes requests in your region, DataZoneStandard keeps them in the US or EU, and GlobalStandard can route anywhere. For a law firm, prefer DataZone or Standard.
 - **No keys.** `disableLocalAuth: true` plus an RBAC role assignment (`Cognitive Services OpenAI User`). Locally that's my identity; deployed, it's the app's managed identity.
+- **Azure OpenAI vs Foundry resource.** The template uses `AddAzureOpenAI` (a classic Azure OpenAI resource, OpenAI models only). A Foundry resource (Aspire's `Aspire.Hosting.Foundry`, still in preview) also offers non-OpenAI models, agents and evaluations, and it shows up in the New Foundry portal. Microsoft is steering new work toward Foundry.
 
 
 --- OLD STUFFS BELOW ---
