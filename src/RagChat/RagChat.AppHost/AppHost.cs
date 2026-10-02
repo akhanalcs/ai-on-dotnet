@@ -4,10 +4,11 @@ var builder = DistributedApplication.CreateBuilder(args);
 // for instructions providing configuration values
 var openai = builder.AddAzureOpenAI("openai");
 
+// The template's gpt-4o-mini (2024-07-18) Standard deployment was retired on 2026-03-31.
 openai.AddDeployment(
-    name: "gpt-4o-mini",
-    modelName: "gpt-4o-mini",
-    modelVersion: "2024-07-18");
+    name: "chat",
+    modelName: "gpt-5.4-mini",
+    modelVersion: "2026-03-17");
 
 openai.AddDeployment(
     name: "text-embedding-3-small",

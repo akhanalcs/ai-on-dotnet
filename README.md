@@ -20,11 +20,10 @@ so it can answer your questions using your own data. [Short summary](https://you
    brew install --cask microsoft/aspire/aspire
    ```
    - To update later, use `brew upgrade --cask aspire`.
-     - `aspire update --self` also works, but it swaps the binary inside Homebrew's versioned folder (`/opt/homebrew/Caskroom/aspire/13.5.0/`), so it prints a "not in your PATH" note and Homebrew loses track of the version.
-     - Harmless: `/opt/homebrew/bin/aspire` is a symlink into that folder, so `aspire --version` shows the new version anyway.
+     - `aspire update --self` also works
 4. Install VS Code extensions
-   - **C# Dev Kit** (`ms-dotnettools.csdevkit`): builds the solution and shows it in Solution Explorer.
-   - **Aspire** (`microsoft-aspire.aspire-vscode`): runs or debugs the AppHost and opens the dashboard inside VS Code.
+   - **C# Dev Kit** (`ms-dotnettools.csdevkit`)
+   - **Aspire** (`microsoft-aspire.aspire-vscode`): runs or debugs the AppHost
    - **Markdown Preview Mermaid Support** (`bierner.markdown-mermaid`): renders the diagrams in this README.
 5. Install Docker Desktop
    - Aspire runs Qdrant and the MarkItDown (PDF → Markdown) MCP server as containers, so Docker must be running before you start the app.
@@ -33,7 +32,19 @@ so it can answer your questions using your own data. [Short summary](https://you
    ```bash
    brew install azure/azd/azd
    ```
-   - You don't need the Azure CLI (`az`). Aspire can sign in to Azure with your `azd auth login` session (`Azure:CredentialSource = AzureDeveloperCli`, see [local provisioning](https://aspire.dev/integrations/cloud/azure/local-provisioning/)).
+   - Aspire can sign in to Azure with your `azd auth login` session (`Azure:CredentialSource = AzureDeveloperCli`, see [local provisioning](https://aspire.dev/integrations/cloud/azure/local-provisioning/)).
+7. Install Azure CLI ([docs](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-macos?view=azure-cli-latest))
+   ```bash
+   brew update && brew install azure-cli
+   az bicep install
+   ```
+   - Why: Aspire turns Azure resources into Bicep and compiles it with the Bicep CLI before deploying. Without it, provisioning fails instantly at `Compiling ARM template -> Failed to Provision`.
+   - The VS Code Bicep extension doesn't provide this; it only ships the language server (editor IntelliSense).
+   - Optional tab completion in bash:
+     ```bash
+     echo 'source $(brew --prefix)/etc/bash_completion.d/az' >> ~/.bash_profile
+     source ~/.bash_profile
+     ```
 
 ## Basics
 
@@ -233,7 +244,7 @@ Create `src/RagChat` with an AppHost, ServiceDefaults, and Web project.
 ```bash
 $ cd ~/RiderProjects/rag-on-dotnet
 $ mkdir src && cd src
-$ dotnet new aichatweb --Framework net10.0 -n RagChat --provider azureopenai --vector-store qdrant --aspire -C gpt-4o-mini -E text-embedding-3-small
+$ dotnet new aichatweb --Framework net10.0 -n RagChat --provider azureopenai --vector-store qdrant --aspire -C gpt-5.4-mini -E text-embedding-3-small
 ```
 
 ### Expected error on first run: mismatched Aspire versions
@@ -248,6 +259,59 @@ System.InvalidOperationException: Step 'provision-openai' depends on unknown ste
   $ aspire update
   ```
 - Since Aspire 13, the SDK brings in the AppHost package, so `aspire update` removes the separate `Aspire.Hosting.AppHost` reference.
+
+## Configure Azure (one time)
+On first run, Aspire creates the Azure OpenAI resource and model deployments in your subscription ([local provisioning](https://aspire.dev/integrations/cloud/azure/local-provisioning/)).
+
+1. Sign in: `azd auth login`
+2. Put the IDs in user secrets. These override the placeholders in `appsettings.json`:
+   ```bash
+   $ cd src/RagChat
+   $ aspire secret set "Azure:SubscriptionId" "<subscription-id>"   # Portal > Subscriptions
+   $ aspire secret set "Azure:TenantId" "<tenant-id>"               # VS Code Azure > Accounts & Tenants
+   ```
+   To see where these are saved, you can do `Cmd` + `Shift` + `P` > `.NET:Manage User Secrets` > Select AppHost project.
+3. The settings that aren't secret live in `RagChat.AppHost/appsettings.json`:
+   ```json
+   "Azure": {
+     "Location": "eastus2",
+     "ResourceGroup": "rg-ragchat-dev-eastus2",
+     "CredentialSource": "AzureDeveloperCli"
+   }
+   ```
+   - Resource group name follows the [CAF naming convention](https://learn.microsoft.com/azure/cloud-adoption-framework/ready/azure-best-practices/resource-naming): `rg-<workload>-<env>-<region>`.
+
+## Run
+1. Start Docker Desktop.
+2. In VS Code: Aspire panel > **Run AppHost**.
+3. Open the dashboard right from the Aspire panel. Click the `aichatweb-app` URL to open the chat.
+
+<img width="500" alt="image" src="screenshots/ragchat-apphost-running.png">
+
+What gets created:
+- **Azure:** `openai-<hash>` Its two model deployments, `chat` and `text-embedding-3-small`, are child resources. `openai-roles` is the role assignment that lets my identity call it.
+- **Docker:** `vectordb` (Qdrant) and `markitdown` (PDF → Markdown MCP server).
+
+## Troubleshooting: what it took to get it running
+| Symptom | Cause | Fix |
+|---|---|---|
+| VS Code Azure extension shows no subscription | VS Code was signed in with a different Microsoft account | **Azure: Sign In** with the account that owns the subscription |
+| `Compiling ARM template -> Failed to Provision` within milliseconds | No Bicep CLI. Aspire compiles Bicep with `az bicep build`. The VS Code Bicep extension doesn't include the CLI | `brew install azure-cli && az bicep install` |
+| `ServiceModelDeprecated: ... gpt-4o-mini, Version:2024-07-18` | Azure retired that model's Standard SKU on 2026-03-31 | Use `gpt-5.4-mini` in `AppHost.cs` |
+| Still `Azure deployment failed` after fixing the model, with no compile step in the log | Aspire cached the failed deployment in user secrets (`Azure:Deployments:openai:*`) and kept reusing it | Remove those keys: `dotnet user-secrets remove "Azure:Deployments:openai:<key>"` for each one |
+| `Container runtime 'docker' could not be found` | Docker Desktop in **User** mode puts the CLI in `~/.docker/bin`, which apps launched from the Dock (VS Code → Aspire) don't have on their PATH | Docker Desktop > Settings > Advanced > **System** (links the CLI into `/usr/local/bin`) |
+| Firefox: "Not Secure" on the dashboard | Firefox uses its own certificate store, not the macOS Keychain where `aspire certs trust` puts the dev cert | Use Safari/Chrome, or click through. (`dotnet dev-certs https --check --trust` confirms the cert is trusted.) |
+
+**Useful while debugging:**
+- Aspire logs: `~/.aspire/logs/cli_*.log`. The debug console only shows state changes.
+
+**Interview notes:**
+- **Deployment name ≠ model name.** The app asks for the deployment `chat`, so when a model is retired only `AppHost.cs` changes.
+- **SKU = data residency.** Standard processes requests in your region, DataZoneStandard keeps them in the US or EU, and GlobalStandard can route anywhere. For a law firm, prefer DataZone or Standard.
+- **No keys.** `disableLocalAuth: true` plus an RBAC role assignment (`Cognitive Services OpenAI User`). Locally that's my identity; deployed, it's the app's managed identity.
+
+
+--- OLD STUFFS BELOW ---
 
 ## Configure AI model provider (I had chosen `githubmodels`)
 https://docs.github.com/en/github-models/prototyping-with-ai-models#experimenting-with-ai-models-using-the-api
