@@ -628,6 +628,61 @@ On the free tier you have to assign users directly. Assigning *groups* to roles 
 
 Sign in as alice, ask about the radio's range, and you should get nothing. Sign in as bob and you'll get the answer.
 
+## Ingestion v2 + hybrid search (Azure AI Search)
+Our own thin "push" pipeline (we read, chunk, embed and upload), built on Microsoft SDKs: `IEmbeddingGenerator` (Microsoft.Extensions.AI), `Azure.Search.Documents`, and PdfPig, to be replaced by Document Intelligence.
+
+```mermaid
+flowchart LR
+    F[File] -->|.pdf| P["PdfReader (PdfPig)<br/>paragraph blocks + page #"]
+    F -->|.md| M["MarkdownReader<br/>paragraph blocks + heading path"]
+    P --> C["Chunker<br/>whole paragraphs, ≤500 tokens,<br/>new chunk per section"]
+    M --> C
+    C --> I["DataIngestor<br/>stable keys · content hash · ACL · batch embed"]
+    I -->|upload, then delete leftovers| S[(Azure AI Search index)]
+```
+
+**Re-ingesting is idempotent:**
+```mermaid
+flowchart TD
+    A[File on disk] --> B[hash = SHA256 of content + allowed groups]
+    B --> C["existing = chunks in the index where documentid == file (keys + hashes only)"]
+    C --> D{"existing not empty AND every chunk's content_hash == hash?"}
+    D -- yes --> E[Skip: nothing changed]
+    D -- no --> F[Read + chunk + embed + upload new chunks]
+    F --> G["Delete existing keys that aren't in the new set (leftovers)"]
+```
+
+**One search query does everything** (`SemanticSearch.SearchAsync`):
+```mermaid
+flowchart LR
+    Q[Question] --> K["Keyword search (BM25)<br/>exact terms: names, section numbers, IDs"]
+    Q --> V["Vector search (embedding)<br/>same meaning, different words"]
+    K --> R["Merge (Reciprocal Rank Fusion)"]
+    V --> R
+    R --> SR["Semantic ranker (reranker)<br/>reads question + chunk together<br/>+ extracts a verbatim caption"]
+    F["Security filter: allowed_groups ∈ user's groups"] -.applied inside the index.-> K & V
+    SR --> Top[Top 5 → model]
+```
+
+| Term | Meaning |
+|---|---|
+| **BM25** | Classic keyword ranking: rare words that appear often in a chunk score high. Finds exact strings that vectors miss |
+| **RRF** (Reciprocal Rank Fusion) | Merges two ranked lists by position, not by score (the two scores aren't comparable) |
+| **Semantic ranker** | Microsoft's reranker model. Slower per item, so it only re-orders the top candidates. Free plan: 1,000 queries/month |
+| **Caption** | The sentence(s) in a chunk that best answer the question, copied word for word. Used for citation highlights |
+| **HNSW** | The graph index behind fast vector search |
+
+Read the code in this order: `IngestedChunk.cs` (the index schema) → `Ingestion/DocumentBlock.cs` → `PdfReader.cs` / `MarkdownReader.cs` → `Chunker.cs` → `DataIngestor.cs` → `SemanticSearch.cs` → `RagAssistant.cs`.
+
+**Interview: why Azure AI Search instead of Qdrant.** At Marathon the knowledge base was IT articles and tickets: semantic Q&A, cost-sensitive, so Qdrant was the right call. Legal content needs exact-term recall (case names, statute sections, matter numbers), reranking, and enterprise controls (Entra ID, private endpoints, customer-managed keys). Azure AI Search gives hybrid search + a reranker in one query. I chose the tool by requirement.
+
+**Interview: why not Microsoft's DataIngestion pipeline.** It's still in preview, and its chunks don't carry the page they came from. In legal work "show me exactly where it says that" is the whole point. So I kept Microsoft's building blocks (`IEmbeddingGenerator`, `Azure.Search.Documents`) and wrote a thin pipeline around them: layout-aware reader, structure-aware chunking, stable keys, content hashing. Next: Document Intelligence as the reader, for OCR (scanned contracts) and tables.
+
+**Interview: tokenizers.** Tokenizers are model-specific. Chunks are sized with the embedding model's tokenizer (cl100k for `text-embedding-3-small`). Prompt budgeting for the chat model would use o200k.
+
+**Cost:** Aspire creates the search service on the Basic tier (about $75/month). Delete the resource group when not in use.
+
+
 
 --- OLD STUFFS BELOW ---
 

@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
@@ -24,7 +24,7 @@ public sealed class RagCollection : ICollectionFixture<RagFixture>
     public const string Name = "Rag";
 }
 
-// Starts the AppHost once (Qdrant, MarkItDown, Azure OpenAI), then builds the same RAG services the web app uses.
+// Starts the AppHost once (Azure OpenAI, Azure AI Search), then builds the same RAG services the web app uses.
 public sealed partial class RagFixture : IAsyncLifetime
 {
     private DistributedApplication? _app;
@@ -38,17 +38,13 @@ public sealed partial class RagFixture : IAsyncLifetime
         var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.RagChat_AppHost>();
         _app = await appHost.BuildAsync();
         await _app.StartAsync();
-        await _app.ResourceNotifications.WaitForResourceHealthyAsync("vectordb");
+        await _app.ResourceNotifications.WaitForResourceAsync("search", KnownResourceStates.Running);
         await _app.ResourceNotifications.WaitForResourceAsync("openai", KnownResourceStates.Running);
-        await _app.ResourceNotifications.WaitForResourceAsync("markitdown", KnownResourceStates.Running);
-
-        // DocumentReader reads this to reach the PDF -> Markdown MCP server
-        Environment.SetEnvironmentVariable("MARKITDOWN_MCP_URL", _app.GetEndpoint("markitdown", "http").ToString().TrimEnd('/'));
 
         // Content root = test output folder, which holds the web app's appsettings.json (incl. the DocumentAccess policy) and Data/
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { ContentRootPath = AppContext.BaseDirectory });
         builder.Configuration["ConnectionStrings:openai"] = await _app.GetConnectionStringAsync("openai");
-        builder.Configuration["ConnectionStrings:vectordb"] = await _app.GetConnectionStringAsync("vectordb");
+        builder.Configuration["ConnectionStrings:search"] = await _app.GetConnectionStringAsync("search");
         builder.AddRagChat(ingestionDirectory: Path.Combine(AppContext.BaseDirectory, "Data"));
         _host = builder.Build();
 
@@ -112,6 +108,8 @@ public sealed partial class RagFixture : IAsyncLifetime
         _ => [result.ToString() ?? ""]
     };
 
-    [GeneratedRegex("<result filename=\"(?<file>[^\"]+)\">")]
+    // Matches the start of a search result, e.g. <result filename="x.pdf" page="3" section="...">, and captures the file name.
+    // No closing ">" right after filename, because page/section attributes follow it.
+    [GeneratedRegex("<result filename=\"(?<file>[^\"]+)\"")]
     private static partial Regex ResultFilename();
 }

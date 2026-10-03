@@ -16,11 +16,9 @@ public static class RagChatServiceExtensions
                 c.EnableSensitiveData = builder.Environment.IsDevelopment());
         openai.AddEmbeddingGenerator("text-embedding-3-small");
 
-        builder.AddQdrantClient("vectordb");
-        builder.Services.AddQdrantVectorStore();
-        builder.Services.AddQdrantCollection<Guid, IngestedChunk>(IngestedChunk.CollectionName);
+        // Azure AI Search (hybrid + semantic ranker). Managed identity, no keys.
+        builder.AddAzureSearchClient("search");
         builder.Services.AddSingleton<DocumentAccessPolicy>();
-        builder.Services.AddSingleton<AccessControlProcessor>();
         builder.Services.AddSingleton<DataIngestor>();
         builder.Services.AddSingleton<SemanticSearch>();
         builder.Services.AddKeyedSingleton("ingestion_directory", new DirectoryInfo(ingestionDirectory));

@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using Microsoft.Extensions.AI;
 
 namespace RagChat.Web.Services;
@@ -36,7 +36,9 @@ public sealed class RagAssistant(SemanticSearch search)
                     [Description("If possible, specify the filename to search that file only. If not provided or empty, the search includes all files.")] string? filenameFilter = null) =>
                 {
                     var results = await search.SearchAsync(searchPhrase, filenameFilter, userGroups, maxResults: 5);
-                    return results.Select(result => $"<result filename=\"{result.DocumentId}\">{result.Text}</result>");
+                    // Provenance travels with each result, so answers can point to the page/section
+                    return results.Select(hit =>
+                        $"<result filename=\"{hit.Chunk.DocumentId}\" page=\"{hit.Chunk.PageNumber}\" section=\"{hit.Chunk.Context}\">{hit.Chunk.Text}</result>");
                 },
                 name: "Search",
                 description: "Searches for information using a phrase or keyword. Relies on documents already being loaded.")

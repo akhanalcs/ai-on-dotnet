@@ -1,41 +1,81 @@
 ﻿using System.Text.Json.Serialization;
-using Microsoft.Extensions.VectorData;
+using Azure.Search.Documents.Indexes;
+using Azure.Search.Documents.Indexes.Models;
 
 namespace RagChat.Web.Services;
 
-// One chunk = one Qdrant point. StorageName is the field name in Qdrant (payload key, or the point ID for the key).
+// One chunk = one document in the Azure AI Search index.
+// The attributes define the index schema (FieldBuilder reads them), JsonPropertyName = field name in the index.
 public class IngestedChunk
 {
-    public const int VectorDimensions = 1536; // 1536 is the default vector size for the OpenAI text-embedding-3-small model
-    public const string VectorDistanceFunction = DistanceFunction.CosineSimilarity;
-    public const string CollectionName = "data-ragchat-chunks";
+    public const string IndexName = "ragchat-chunks";
+    public const string SemanticConfiguration = "default";
+    private const string VectorProfile = "default";
+    public const int VectorDimensions = 1536; // text-embedding-3-small output size
 
-    // Qdrant point ID
-    [VectorStoreKey(StorageName = "key")]
+    [SimpleField(IsKey = true)]
     [JsonPropertyName("key")]
-    public required Guid Key { get; set; }
+    public string Key { get; set; } = "";
 
-    [VectorStoreData(StorageName = "documentid")]
+    // Source file name; filterable so search can be limited to one document
+    [SimpleField(IsFilterable = true)]
     [JsonPropertyName("documentid")]
-    public required string DocumentId { get; set; }
+    public string DocumentId { get; set; } = "";
 
-    [VectorStoreData(StorageName = "content")]
+    // The chunk text. Searchable = keyword (BM25) half of hybrid search
+    [SearchableField(AnalyzerName = LexicalAnalyzerName.Values.EnMicrosoft)]
     [JsonPropertyName("content")]
-    public required string Text { get; set; }
+    public string Text { get; set; } = "";
 
-    [VectorStoreData(StorageName = "context")]
+    // Section heading path, e.g. "3. Setup and Installation > 3.1 Charging"
+    [SearchableField]
     [JsonPropertyName("context")]
     public string? Context { get; set; }
 
-    // Groups allowed to read this chunk, e.g. ["COC-6"]. Written by AccessControlProcessor at ingestion.
-    // Indexed because every search filters on it.
-    [VectorStoreData(StorageName = "allowed_groups", IsIndexed = true)]
+    // PDF page the chunk starts on (null for Markdown). Lets a citation open the exact page.
+    [SimpleField]
+    [JsonPropertyName("page")]
+    public int? PageNumber { get; set; }
+
+    // Groups allowed to read this chunk, e.g. ["COC-6"]. Every search filters on it (security trimming).
+    [SimpleField(IsFilterable = true)]
     [JsonPropertyName("allowed_groups")]
     public string[] AllowedGroups { get; set; } = [];
 
-    // A string vector property means "embed this text for me" with the registered IEmbeddingGenerator.
-    // Qdrant stores the resulting 1536 floats as the point's vector (dimensions, not a length limit on Text).
-    [VectorStoreVector(VectorDimensions, DistanceFunction = VectorDistanceFunction, StorageName = "embedding")]
+    // Fingerprint of the source file + its access groups. Unchanged hash = skip re-ingesting.
+    [SimpleField]
+    [JsonPropertyName("content_hash")]
+    public string? ContentHash { get; set; }
+
+    // Embedding of Text = vector half of hybrid search
+    [VectorSearchField(VectorSearchDimensions = VectorDimensions, VectorSearchProfileName = VectorProfile)]
     [JsonPropertyName("embedding")]
-    public string? Vector => Text;
+    public ReadOnlyMemory<float>? Embedding { get; set; }
+
+    // The index definition, like a CREATE TABLE. Three parts:
+    public static SearchIndex CreateIndex() => new(
+        IndexName,
+        // 1. Columns: FieldBuilder turns the attributes on the properties above into index fields
+        new FieldBuilder().Build(typeof(IngestedChunk)))
+    {
+        // 2. How "embedding" is searched: HNSW = a graph index for fast nearest-neighbor lookup (cosine similarity by default).
+        //    The [VectorSearchField] above points at this profile by name.
+        VectorSearch = new()
+        {
+            Algorithms = { new HnswAlgorithmConfiguration("hnsw") },
+            Profiles = { new VectorSearchProfile(VectorProfile, "hnsw") }
+        },
+        // 3. What the semantic ranker (reranker) reads: the section heading as the title, the chunk text as the content
+        SemanticSearch = new()
+        {
+            Configurations =
+            {
+                new SemanticConfiguration(SemanticConfiguration, new SemanticPrioritizedFields
+                {
+                    TitleField = new SemanticField("context"),
+                    ContentFields = { new SemanticField("content") }
+                })
+            }
+        }
+    };
 }

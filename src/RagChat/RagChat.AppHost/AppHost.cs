@@ -1,4 +1,4 @@
-var builder = DistributedApplication.CreateBuilder(args);
+﻿var builder = DistributedApplication.CreateBuilder(args);
 
 // See https://learn.microsoft.com/dotnet/aspire/azure/local-provisioning#configuration
 // for instructions providing configuration values
@@ -16,22 +16,15 @@ openai.AddDeployment(
     modelName: "text-embedding-3-small",
     modelVersion: "1");
 
-var vectorDB = builder.AddQdrant("vectordb")
-    .WithDataVolume()
-    .WithLifetime(ContainerLifetime.Persistent);
-
-var markitdown = builder.AddContainer("markitdown", "mcp/markitdown")
-    .WithArgs("--http", "--host", "0.0.0.0", "--port", "3001")
-    .WithHttpEndpoint(targetPort: 3001, name: "http");
+// Azure AI Search: hybrid (keyword + vector) search + semantic ranker. The web app gets index read/write roles.
+var search = builder.AddAzureSearch("search");
 
 var webApp = builder.AddProject<Projects.RagChat_Web>("aichatweb-app");
 webApp
     .WithReference(openai)
     .WaitFor(openai);
 webApp
-    .WithReference(vectorDB)
-    .WaitFor(vectorDB);
-webApp
-    .WithEnvironment("MARKITDOWN_MCP_URL", markitdown.GetEndpoint("http"));
+    .WithReference(search)
+    .WaitFor(search);
 
 builder.Build().Run();
