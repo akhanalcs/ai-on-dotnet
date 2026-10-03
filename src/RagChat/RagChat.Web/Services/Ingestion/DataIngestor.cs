@@ -12,13 +12,17 @@ public class DataIngestor(
     VectorStore vectorStore,
     IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator)
 {
+    // It returns one Task, and that task finishes only after every document has been ingested.
+    // At the first await that can't finish right away, the method returns that one Task to the caller. The Task is still incomplete at that point.
+    // Each later await pauses the state machine and resumes it when the awaited work is done. No new task goes back to the caller.
+    // The Task only completes after the last line runs, meaning the await foreach loop has finished. If an exception escapes, the Task faults instead.
     public async Task IngestDataAsync(DirectoryInfo directory, string searchPattern)
     {
         using var writer = new VectorStoreWriter<string>(vectorStore, dimensionCount: IngestedChunk.VectorDimensions, new()
         {
             CollectionName = IngestedChunk.CollectionName,
             DistanceFunction = IngestedChunk.VectorDistanceFunction,
-            IncrementalIngestion = false,
+            IncrementalIngestion = true
         });
 
         using var pipeline = new IngestionPipeline<string>(
