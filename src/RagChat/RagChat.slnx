@@ -1,0 +1,11 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="RagChat.AppHost/RagChat.AppHost.csproj" Type="2f122dc7-2d5d-40a8-bd85-60336215889f" />
+  <Project Path="RagChat.Evaluation/RagChat.Evaluation.csproj" />
+  <Project Path="RagChat.ServiceDefaults/RagChat.ServiceDefaults.csproj" Type="2f122dc7-2d5d-40a8-bd85-60336215889f" />
+  <Project Path="RagChat.Web/RagChat.Web.csproj" Type="2f122dc7-2d5d-40a8-bd85-60336215889f" />
+</Solution>
