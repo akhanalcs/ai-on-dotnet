@@ -5,6 +5,8 @@ It's a RAG (Retrieval-Augmented Generation) application that uses a vector datab
 Simply put, LLMs can't access your company's information directly. RAG lets you share relevant documents with the LLM, 
 so it can answer your questions using your own data. [Short summary](https://youtube.com/shorts/xS55duPS-Pw?si=9iAMDJ593p34ZAG6).
 
+**Interview prep:** [docs/interview-prep.md](docs/interview-prep.md) covers model choices, chunk sizing, ServiceNow RAG design, and what a law-firm RAG needs.
+
 ## Helpful Links
 - [Exploring the new AI chat template](https://andrewlock.net/exploring-the-new-ai-chat-template/)
 - [Develop AI agents with Semantic Kernel - Jakob Ehn - NDC Oslo 2024](https://youtu.be/idH0dD7UiqE?si=QkDeUYVgmI-jDFnd)
@@ -222,6 +224,8 @@ Template options:
 ```
 
 ### Terminology
+0. Token
+    - The unit an LLM reads and writes: a word, part of a word, or punctuation. Roughly 100 tokens ≈ 75 words in English. Prices, context windows and chunk sizes are all measured in tokens.
 1. AI service provider (`--provider`)
     - The service that provides the AI model. For example, OpenAI, GitHub Models, Azure OpenAI, etc.
 2. Vector store (`--vector-store`)
@@ -245,6 +249,12 @@ Create `src/RagChat` with an AppHost, ServiceDefaults, and Web project.
 $ cd ~/RiderProjects/rag-on-dotnet
 $ mkdir src && cd src
 $ dotnet new aichatweb --Framework net10.0 -n RagChat --provider azureopenai --vector-store qdrant --aspire -C gpt-5.4-mini -E text-embedding-3-small
+```
+
+### Upgrade .sln to .slnx
+```bash
+dotnet sln RagChat.sln migrate
+git rm RagChat.sln
 ```
 
 ### Expected error on first run: mismatched Aspire versions
@@ -348,6 +358,275 @@ Pay per token; no hourly charge. Retail prices for eastus2 ([Azure Retail Prices
 - **SKU = data residency.** Standard processes requests in your region, DataZoneStandard keeps them in the US or EU, and GlobalStandard can route anywhere. For a law firm, prefer DataZone or Standard.
 - **No keys.** `disableLocalAuth: true` plus an RBAC role assignment (`Cognitive Services OpenAI User`). Locally that's my identity; deployed, it's the app's managed identity.
 - **Azure OpenAI vs Foundry resource.** The template uses `AddAzureOpenAI` (a classic Azure OpenAI resource, OpenAI models only). A Foundry resource (Aspire's `Aspire.Hosting.Foundry`, still in preview) also offers non-OpenAI models, agents and evaluations, and it shows up in the New Foundry portal. Microsoft is steering new work toward Foundry.
+
+## Challenges & lessons (interview prep)
+Each one is phrased as **problem → cause → what I did → what I'd do in production**.
+
+1. **Duplicate chunks on every restart (non-idempotent ingestion).**
+   - 19 points in Qdrant became 38 after a restart.
+   - Cause: Qdrant data persists (`WithDataVolume()` + persistent container), but ingestion re-runs on every app start, writing new GUID keys. In `DataIngestor.cs`, `IncrementalIngestion = false` appends instead of replacing.
+   - Fix: `IncrementalIngestion = true`. The writer deletes a document's old chunks after inserting the new ones, so it **replaces by document ID**.
+   - Production: *"Re-running ingestion must not create duplicates. Replace a document's chunks by its document ID, use stable keys, and skip unchanged files by comparing a content hash. In my production version, ingestion runs on a schedule in an Azure Function, not lazily in the web app."*
+   - How [azure-search-openai-demo-csharp](https://github.com/Azure-Samples/azure-search-openai-demo-csharp) does it:
+     - It uses **deterministic chunk keys** (`{blobName}-{offset}`) with `MergeOrUpload`, so re-running overwrites instead of duplicating.
+     - A **blob-triggered** Function (`embed-blob`) embeds each file when it's uploaded.
+     - `prepdocs --remove` deletes a file's chunks.
+     - Gap: if a document shrinks, its old higher-offset chunks stay behind. "Delete by document, then insert" avoids that.
+2. **Chat model retired under me.**
+   - The template's `gpt-4o-mini` (2024-07-18, Standard) was retired on 2026-03-31, so provisioning failed.
+   - Lesson: the app asks for a **deployment name** (`chat`), not a model, so only `AppHost.cs` changed. Pin versions, watch retirement dates, and keep the model swappable through configuration.
+3. **Embedding model retirement is worse than chat model retirement.**
+   - Vectors from different embedding models (or even different dimensions) **can't be compared**, so changing the embedding model means **re-embedding the whole corpus**.
+   - Plan for it:
+     - Keep the source documents (Blob Storage) as the source of truth.
+     - Store the embedding model and version alongside the vectors.
+     - Build the new collection side by side, then switch over (a blue/green index swap; Qdrant collection aliases make the switch atomic).
+     - Because ingestion is idempotent and automated, a re-embed is just one job run. Embedding is cheap: about $0.02 per 1M tokens.
+4. **Picking a SKU = data residency + quota + cost.**
+   - `gpt-5.4-mini` had quota only on DataZoneStandard, and Aspire defaults to Standard.
+   - For learning I picked `gpt-5-mini` on GlobalStandard (cheapest). For a law firm I'd pick DataZone or Standard, so processing stays in the US.
+   - Always check that the model is **offered and** has **quota** for that SKU in the region.
+5. **Keyless auth (managed identity) from day one.**
+   - Aspire provisions Azure OpenAI with `disableLocalAuth: true` plus a `Cognitive Services OpenAI User` role assignment.
+   - The same code runs as my identity locally and as the app's managed identity in Azure, with no secrets to rotate or leak.
+6. **Infrastructure state drift.**
+   - After a failed deployment, Aspire kept reusing its cached "Running" state (stored in user secrets) and never redeployed.
+   - Lesson: IaC tools keep state. When reality and state disagree, inspect the real error in Azure (resource group > Deployments) and reset the state; don't keep retrying.
+7. **Template dependency drift.**
+   - The template shipped mixed Aspire versions (13.0 and 13.4), which crashed at startup. `aspire update` aligned them.
+   - Lesson: pin and align package families, and keep a fast path to upgrade them.
+
+## How a chunk is stored (`IngestedChunk` ↔ Qdrant)
+A Qdrant **point** = one chunk = one `IngestedChunk` record. `StorageName` sets the field name in Qdrant.
+
+```mermaid
+flowchart LR
+    subgraph C# record: IngestedChunk
+        K[Key : Guid]
+        D[DocumentId : string]
+        T[Text : string]
+        X[Context : string?]
+        V["Vector => Text"]
+    end
+    subgraph Qdrant point
+        PID[Point ID]
+        P1[payload.documentid]
+        P2[payload.content]
+        P3[payload.context]
+        VEC["vector: 1536 floats"]
+    end
+    K --> PID
+    D --> P1
+    T --> P2
+    X --> P3
+    V -- "embedded by text-embedding-3-small on upsert" --> VEC
+```
+
+| Property | Attribute | In Qdrant | Notes |
+|---|---|---|---|
+| `Key` | `[VectorStoreKey]` | Point ID (e.g. `20cfc7f1-…`) | Unique ID of the chunk |
+| `DocumentId` | `[VectorStoreData]` | payload `documentid` | Source file name; used to filter search to one file |
+| `Text` | `[VectorStoreData]` | payload `content` | The chunk text sent back to the model |
+| `Context` | `[VectorStoreData]` | payload `context` | Empty here. Meant for extra context like section heading/doc title |
+| `Vector` | `[VectorStoreVector(1536, CosineSimilarity)]` | the point's vector | `string` type means "embed this text for me" using the registered `IEmbeddingGenerator`. Not shown as payload; the dashboard shows only `Length: 1536` |
+
+**1536 is the number of floats in the vector (dimensions), not a word limit.** Every chunk, short or long, becomes exactly 1536 numbers, which is what `text-embedding-3-small` outputs. Chunk *length* is decided by the chunker (token budget), capped by the embedding model's input limit (8,191 tokens).
+
+**Cosine similarity** compares the direction of two vectors: the query's and each chunk's. A score closer to 1 means more similar meaning.
+
+**Adding metadata** = adding properties. Mark the ones you filter on as `IsIndexed = true`, which creates a payload index in Qdrant:
+```csharp
+[VectorStoreData(StorageName = "allowed_groups", IsIndexed = true)]  // security trimming: ["COC-6"]
+public string[] AllowedGroups { get; set; } = [];
+
+[VectorStoreData(StorageName = "page_start")] public int PageStart { get; set; }
+[VectorStoreData(StorageName = "page_end")]   public int PageEnd { get; set; }
+[VectorStoreData(StorageName = "regions")]    public string? RegionsJson { get; set; } // bounding boxes, used only for highlighting
+```
+
+## Chunking & provenance (target design)
+- **Pages are metadata, not chunk boundaries.**
+  - Chunk by meaning or token budget (with ~10–15% overlap) **across** page breaks, so a thought split over two pages stays together.
+  - Record each chunk's **page span** (`PageStart`–`PageEnd`) and the bounding regions it covers.
+- **Source of provenance:** [Azure AI Document Intelligence `prebuilt-layout`](https://learn.microsoft.com/azure/ai-services/document-intelligence/prebuilt/layout) returns paragraphs, tables and headings, each with page number and coordinates. MarkItDown flattens the PDF to Markdown and loses pages.
+- **Structure-aware chunking:** split on headings and sections first, then by token size. Keep tables whole. Put the section heading in `Context`, so a chunk like "8.2 Whistle…" still knows it belongs to "8. Emergency Communication".
+- **Citations by chunk ID:**
+  - Search results are numbered `[1]`, `[2]`, …, and each number maps to a chunk key.
+  - The model cites `[n]`.
+  - The UI resolves `[n]` to file + page + regions, then opens the page and highlights the exact paragraph. It's deterministic, with no fuzzy text search.
+- **Source files behind authorization:** citations link to an endpoint that checks the user's groups before streaming the file (or issues a short-lived Blob SAS). They never link to a public static path.
+
+## Roadmap: from template to law-firm-grade RAG
+One step at a time. Each step ends with working code plus a README section.
+
+| # | Step | What it adds | Status |
+|---|---|---|---|
+| 0 | Baseline running on Azure + idempotent re-ingestion (`IncrementalIngestion = true`) | No duplicate chunks on restart | ✅ |
+| 1 | **Evaluation harness** (golden Q&A set + `Microsoft.Extensions.AI.Evaluation` tests) | A quality baseline, so every later change is measured | |
+| 2 | **Security trimming** (Entra ID sign-in, `AllowedGroups` per chunk, filter in search, authorized file endpoint) | Ethical walls: COC-4 users never retrieve COC-6 content | |
+| 3 | **Ingestion v2** (stable keys, content hash, heading-aware chunks with `Context`, page numbers) | Idempotent, structure-aware chunks with provenance | |
+| 4 | **Guardrails + audit log** (Prompt Shields / Content Safety, append-only audit table) | Prompt-injection defense; who asked what and what they were shown | |
+| 5 | **Hybrid search + reranking** | Exact terms (case names, statute sections, ticket numbers) rank correctly | |
+| 6 | **Chunk-ID citations** to exact page + highlight | Deterministic, auditable citations | |
+| 7 | **Ingestion as a timer Azure Function** + **ServiceNow connector** (free developer instance) | API source + documents in one permission-aware index | |
+| 8 | **Deploy** (`azd up`) + **CI/CD** (GitHub Actions with OIDC, evals in the pipeline) | Production path | |
+
+## Ingestion and Search
+```mermaid
+sequenceDiagram
+    participant LLM as Chat (tool call)
+    participant SS as SemanticSearch (singleton)
+    participant DI as DataIngestor
+    participant P as IngestionPipeline
+    participant EMB as Embeddings (Azure OpenAI)
+    participant Q as Qdrant
+
+    LLM->>SS: SearchAsync(text, filter, max)
+    SS->>SS: await LoadDocumentsAsync()
+    alt first call (_ingestionTask == null)
+        SS->>DI: IngestDataAsync() returns ONE Task (incomplete)
+        SS->>SS: _ingestionTask = that Task, then await it
+        loop await foreach, once per document
+            DI->>P: MoveNextAsync()
+            P->>P: read file, semantic chunking
+            P->>EMB: embed chunks
+            P->>Q: upsert points
+            P-->>DI: IngestionResult (DocumentId, Succeeded)
+            DI->>DI: log it
+        end
+        DI-->>SS: Task completes (all docs done)
+    else later calls
+        SS->>SS: _ingestionTask already completed, continue immediately
+    end
+    SS->>SS: nearest = SearchAsync(...) is lazy, nothing sent yet
+    SS->>SS: .Select(r => r.Record) is lazy too
+    SS->>EMB: ToListAsync() starts enumeration, embeds query text
+    SS->>Q: top-K cosine search (+ DocumentId filter)
+    Q-->>SS: stream of VectorSearchResult
+    SS-->>LLM: List<IngestedChunk>
+```
+
+## Chat component
+```mermaid
+sequenceDiagram
+    participant U as User (Blazor)
+    participant C as Chat.razor
+    participant FI as UseFunctionInvocation
+    participant M as gpt-5-mini
+    participant S as SemanticSearch
+    participant Q as Qdrant
+    U->>C: "What's in the survival kit?"
+    C->>FI: GetStreamingResponseAsync(history, tools)
+    FI->>M: messages + tool schemas
+    M-->>FI: call LoadDocuments()
+    FI->>S: LoadDocumentsAsync (ingest once)
+    FI->>M: tool result
+    M-->>FI: call Search("survival kit contents")
+    FI->>S: SearchAsync → embed query → Q
+    Q-->>S: top 5 chunks
+    FI->>M: <result filename=...>text</result> ×5
+    M-->>C: streamed answer + <citation .../>
+    C-->>U: text + citation chips
+```
+
+## 	Evaluation harness, the quality baseline everything else gets measured against
+Create the test project
+```bash
+cd ~/RiderProjects/rag-on-dotnet/src/RagChat
+dotnet new xunit -n RagChat.Evaluation
+dotnet sln RagChat.sln add RagChat.Evaluation/RagChat.Evaluation.csproj
+dotnet add RagChat.Evaluation reference RagChat.Web/RagChat.Web.csproj
+dotnet add RagChat.Evaluation package Microsoft.Extensions.AI.Evaluation.Quality
+dotnet add RagChat.Evaluation package Microsoft.Extensions.AI.Evaluation.Reporting
+
+dotnet add RagChat.Evaluation package Aspire.Hosting.Testing
+dotnet add RagChat.Evaluation reference RagChat.AppHost/RagChat.AppHost.csproj
+```
+
+```mermaid
+sequenceDiagram
+    participant T as dotnet test
+    participant F as RagFixture (once)
+    participant A as AppHost (in-process)
+    participant D as Docker
+    participant Z as Azure (existing rg-ragchat-dev-eastus2)
+    participant R as RagQualityTests (×6 questions)
+    T->>F: InitializeAsync
+    F->>A: start AppHost, same as Run AppHost
+    A->>D: start Qdrant + MarkItDown containers
+    A->>Z: "is openai provisioned?" → yes (cached) → reuse
+    F->>F: build services with AddRagChat (same as the web app)
+    loop each golden question
+        T->>R: run test
+        R->>Z: ask gpt-5-mini (with Search tool) → answer
+        R->>R: check: expected document retrieved?
+        R->>Z: ask the judge to score the answer 1–5
+        R->>R: fail if any score is poor
+    end
+    T->>F: DisposeAsync (stop containers)
+```
+**Interview line:**
+
+The evaluation suite runs in CI against a dedicated, pre-provisioned resource group. The pipeline identity can only call models, not create resources, and a drop in quality fails the build just like a failing unit test.
+
+## Step 2: security trimming (ethical walls)
+```mermaid
+flowchart LR
+    U[User signs in<br/>Entra ID] -->|token: roles = COC-6| C[Chat.razor]
+    C -->|CreateChatOptions with user's groups| T[Search tool]
+    T -->|filter: allowed_groups contains COC-6| Q[(Qdrant)]
+    I[Ingestion] -->|AccessControlProcessor stamps allowed_groups| Q
+    P[DocumentAccess policy<br/>appsettings.json] --> I
+    P --> E["/documents/{name}<br/>authorized file endpoint"]
+    C -.citation link.-> E
+```
+
+```mermaid
+sequenceDiagram
+    participant B as Browser (signed in)
+    participant V as wwwroot/lib/pdf_viewer (public)
+    participant E as /documents/{name} (authorized)
+    B->>V: open viewer.html?file=/documents/Example_Emergency_Survival_Kit.pdf#search=...
+    V->>E: fetch the PDF (same site, so the sign-in cookie goes along)
+    E->>E: signed in? user's roles allowed by DocumentAccess policy?
+    alt allowed (bob, COC-6)
+        E-->>V: PDF bytes → viewer renders + highlights quote
+    else not allowed (alice, COC-4)
+        E-->>V: 404 → viewer shows an error
+    end
+```
+
+| Piece | File | What it does |
+|---|---|---|
+| **Policy** | [DocumentAccessPolicy.cs](src/RagChat/RagChat.Web/Services/Security/DocumentAccessPolicy.cs) + `DocumentAccess` in [appsettings.json](src/RagChat/RagChat.Web/appsettings.json) | GPS watch = COC-4, survival kit = COC-6. **Default deny**: a document that isn't listed is visible to nobody |
+| **Tag at ingestion** | [AccessControlProcessor.cs](src/RagChat/RagChat.Web/Services/Ingestion/AccessControlProcessor.cs) | Stamps each chunk with `allowed_groups` before it's written to Qdrant |
+| **Schema** | `AllowedGroups` in [IngestedChunk.cs](src/RagChat/RagChat.Web/Services/IngestedChunk.cs) | Indexed, because every search filters on it |
+| **Filter at search** | [SemanticSearch.cs](src/RagChat/RagChat.Web/Services/SemanticSearch.cs) | The filter runs **inside Qdrant**, so forbidden chunks never reach the app or the model. A user with no groups gets nothing |
+| **Groups can't be faked** | [RagAssistant.cs](src/RagChat/RagChat.Web/Services/RagAssistant.cs) | The user's groups are captured in code when the tools are created. **They aren't a tool parameter**, so the model, or a prompt injection, can't change them |
+| **Who is the user** | [UserGroups.cs](src/RagChat/RagChat.Web/Services/Security/UserGroups.cs) + [Program.cs](src/RagChat/RagChat.Web/Program.cs) | Entra ID sign-in. **App roles** (`roles` claim) instead of raw group IDs: they're readable, and they avoid the 200-group overage limit. Every page requires sign-in |
+| **Files** | [DocumentEndpoints.cs](src/RagChat/RagChat.Web/Services/Security/DocumentEndpoints.cs) | I moved the documents from `wwwroot/Data` to `Data/`, so they're **no longer public**. Citations go through `/documents/{name}`, which checks the policy and returns **404, not 403**, so it doesn't reveal that a document exists |
+| **Regression tests** | [SecurityTrimmingTests.cs](src/RagChat/RagChat.Evaluation/SecurityTrimmingTests.cs) | A COC-4 user who *pushes* the model to search the COC-6 file still gets nothing back from it, and a user with no groups gets nothing at all. These checks are deterministic |
+
+**1. Add the package:**
+```sh
+cd ~/RiderProjects/rag-on-dotnet/src/RagChat
+dotnet add RagChat.Web package Microsoft.Identity.Web
+```
+
+**2. Register the app in Entra ID** (Portal → **Microsoft Entra ID** → **App registrations** → **New registration**):
+- Name: `ragchat-dev`, single tenant.
+- Redirect URI: **Web**, `https://localhost:7266/signin-oidc`.
+- After creating it, go to **Authentication** and tick **ID tokens**. That's needed because we only sign users in and don't call other APIs, so no client secret is required.
+- Go to **App roles** and create two roles: Display name / Value `COC-4` and `COC-6`, allowed member types **Users/Groups**.
+- Copy the **Application (client) ID** into `AzureAd:ClientId` in `appsettings.json`.
+
+**3. Users** (Entra ID → **Users** → **New user**): create `alice@affableashkoutlook.onmicrosoft.com` and `bob@…`. Then go to **Enterprise applications** → `ragchat-dev` → **Users and groups** and assign **alice = COC-4** and **bob = COC-6**.
+
+On the free tier you have to assign users directly. Assigning *groups* to roles needs Entra ID P1, which is what a law firm would use.
+
+**4. Clear the collection.** Delete `data-ragchat-chunks` in the Qdrant dashboard, so everything is re-ingested with `allowed_groups`.
+
+Sign in as alice, ask about the radio's range, and you should get nothing. Sign in as bob and you'll get the answer.
 
 
 --- OLD STUFFS BELOW ---
