@@ -10,7 +10,8 @@ public class DataIngestor(
     ILogger<DataIngestor> logger,
     ILoggerFactory loggerFactory,
     VectorStore vectorStore,
-    IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator)
+    IEmbeddingGenerator<string, Embedding<float>> embeddingGenerator,
+    AccessControlProcessor accessControl)
 {
     // It returns one Task, and that task finishes only after every document has been ingested.
     // At the first await that can't finish right away, the method returns that one Task to the caller. The Task is still incomplete at that point.
@@ -30,6 +31,9 @@ public class DataIngestor(
             chunker: new SemanticSimilarityChunker(embeddingGenerator, new(TiktokenTokenizer.CreateForModel("gpt-4o"))),
             writer: writer,
             loggerFactory: loggerFactory);
+
+        // Stamp each chunk with who may read it, before it's written (security trimming happens at search time)
+        pipeline.ChunkProcessors.Add(accessControl);
 
         await foreach (var result in pipeline.ProcessAsync(directory, searchPattern))
         {

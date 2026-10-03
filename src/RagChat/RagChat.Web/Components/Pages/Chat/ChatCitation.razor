@@ -1,4 +1,4 @@
-@using System.Web
+﻿@using System.Web
 @if (!string.IsNullOrWhiteSpace(viewerUrl))
 {
     <a href="@viewerUrl" target="_blank" class="citation">
@@ -28,12 +28,12 @@
         // If you ingest other types of content besides Markdown or PDF files, construct a URL to an appropriate viewer here
         if (File.EndsWith(".md"))
         {
-            viewerUrl = $"lib/markdown_viewer/viewer.html?file=/Data/{HttpUtility.UrlEncode(File)}#:~:text={Uri.EscapeDataString(Quote ?? "")}";
+            viewerUrl = $"lib/markdown_viewer/viewer.html?file=/documents/{HttpUtility.UrlEncode(File)}#:~:text={Uri.EscapeDataString(Quote ?? "")}";
         }
         else if (File.EndsWith(".pdf"))
         {
             var search = Quote?.Trim('.', ',', ' ', '\n', '\r', '\t', '"', '\'');
-            viewerUrl = $"lib/pdf_viewer/viewer.html?file=/Data/{HttpUtility.UrlEncode(File)}#search={HttpUtility.UrlEncode(search)}&phrase=true";
+            viewerUrl = $"lib/pdf_viewer/viewer.html?file=/documents/{HttpUtility.UrlEncode(File)}#search={HttpUtility.UrlEncode(search)}&phrase=true";
         }
     }
 }

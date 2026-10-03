@@ -27,6 +27,12 @@ public class IngestedChunk
     [JsonPropertyName("context")]
     public string? Context { get; set; }
 
+    // Groups allowed to read this chunk, e.g. ["COC-6"]. Written by AccessControlProcessor at ingestion.
+    // Indexed because every search filters on it.
+    [VectorStoreData(StorageName = "allowed_groups", IsIndexed = true)]
+    [JsonPropertyName("allowed_groups")]
+    public string[] AllowedGroups { get; set; } = [];
+
     // A string vector property means "embed this text for me" with the registered IEmbeddingGenerator.
     // Qdrant stores the resulting 1536 floats as the point's vector (dimensions, not a length limit on Text).
     [VectorStoreVector(VectorDimensions, DistanceFunction = VectorDistanceFunction, StorageName = "embedding")]

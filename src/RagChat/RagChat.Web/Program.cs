@@ -1,25 +1,23 @@
-using Microsoft.Extensions.AI;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.Identity.Web;
 using RagChat.Web.Components;
 using RagChat.Web.Services;
-using RagChat.Web.Services.Ingestion;
+using RagChat.Web.Services.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
-var openai = builder.AddAzureOpenAIClient("openai");
-openai.AddChatClient("chat")
-    .UseFunctionInvocation()
-    .UseOpenTelemetry(configure: c =>
-        c.EnableSensitiveData = builder.Environment.IsDevelopment());
-openai.AddEmbeddingGenerator("text-embedding-3-small");
+// Sign-in with Entra ID (OpenID Connect). The token's "roles" claim carries the user's access groups (COC-4, COC-6).
+builder.Services.AddAuthentication(OpenIdConnectDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApp(builder.Configuration.GetSection("AzureAd"));
+// Every page and endpoint requires a signed-in user unless it opts out
+builder.Services.AddAuthorization(options => options.FallbackPolicy = options.DefaultPolicy);
+// Lets Blazor components read the signed-in user
+builder.Services.AddCascadingAuthenticationState();
 
-builder.AddQdrantClient("vectordb");
-builder.Services.AddQdrantVectorStore();
-builder.Services.AddQdrantCollection<Guid, IngestedChunk>(IngestedChunk.CollectionName);
-builder.Services.AddSingleton<DataIngestor>();
-builder.Services.AddSingleton<SemanticSearch>();
-builder.Services.AddKeyedSingleton("ingestion_directory", new DirectoryInfo(Path.Combine(builder.Environment.WebRootPath, "Data")));
+// Documents live outside wwwroot, so they're never served as public static files
+builder.AddRagChat(ingestionDirectory: Path.Combine(builder.Environment.ContentRootPath, "Data"));
 
 var app = builder.Build();
 
@@ -34,9 +32,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles(); // wwwroot (CSS, JS, PDF viewer) stays public
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
-app.UseStaticFiles();
+app.MapDocumentEndpoints();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

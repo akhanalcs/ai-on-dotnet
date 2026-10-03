@@ -1,13 +1,14 @@
 ﻿@page "/"
-@using System.ComponentModel
 @inject IChatClient ChatClient
 @inject NavigationManager Nav
-@inject SemanticSearch Search
+@inject RagAssistant Assistant
+@using RagChat.Web.Services.Security
 @implements IDisposable
 
 <PageTitle>Chat</PageTitle>
 
 <ChatHeader OnNewChat="@ResetConversationAsync" />
+<p class="page-width">Signed in as <b>@userName</b> · Access: <b>@(userGroups.Count > 0 ? string.Join(", ", userGroups) : "none")</b></p>
 
 <ChatMessageList Messages="@messages" InProgressMessage="@currentResponseMessage">
     <NoMessagesContent>
@@ -24,40 +25,29 @@
 </div>
 
 @code {
-    private const string SystemPrompt = @"
-        You are an assistant who answers questions about information you retrieve.
-        Do not answer questions about anything else.
-        Use only simple markdown to format your responses.
-
-        Use the LoadDocuments tool to prepare for searches before answering any questions.
-
-        Use the Search tool to find relevant information. When you do this, end your
-        reply with citations in the special XML format:
-
-        <citation filename='string'>exact quote here</citation>
-
-        Always include the citation in your response if there are results.
-
-        The quote must be max 5 words, taken word-for-word from the search result, and is the basis for why the citation is relevant.
-        Don't refer to the presence of citations; just emit these tags right at the end, with no surrounding text.
-        ";
-
     private int statefulMessageCount;
-    private readonly ChatOptions chatOptions = new();
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationState { get; set; } = default!;
+
+    private string? userName;
+    private IReadOnlyCollection<string> userGroups = [];
+    private ChatOptions chatOptions = default!;
     private readonly List<ChatMessage> messages = new();
     private CancellationTokenSource? currentResponseCancellation;
     private ChatMessage? currentResponseMessage;
     private ChatInput? chatInput;
     private ChatSuggestions? chatSuggestions;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        // The signed-in user's access groups decide what Search can return for this whole conversation
+        var user = (await AuthenticationState).User;
+        userName = user.Identity?.Name;
+        userGroups = UserGroups.From(user);
+
         statefulMessageCount = 0;
-        messages.Add(new(ChatRole.System, SystemPrompt));
-        chatOptions.Tools = [
-            AIFunctionFactory.Create(LoadDocumentsAsync),
-            AIFunctionFactory.Create(SearchAsync)
-        ];
+        messages.Add(new(ChatRole.System, RagAssistant.SystemPrompt));
+        chatOptions = Assistant.CreateChatOptions(userGroups);
     }
 
     private async Task AddUserMessageAsync(ChatMessage userMessage)
@@ -76,6 +66,11 @@
         await foreach (var update in ChatClient.GetStreamingResponseAsync(messages.Skip(statefulMessageCount), chatOptions, currentResponseCancellation.Token))
         {
             messages.AddMessages(update, filter: c => c is not TextContent);
+            if (update.Contents.Any(c => c is FunctionCallContent))
+            {
+                // Show the tool call (e.g. "Searching...") while the tool runs
+                await InvokeAsync(StateHasChanged);
+            }
             responseText.Text += update.Text;
             chatOptions.ConversationId = update.ConversationId;
             ChatMessageItem.NotifyChanged(currentResponseMessage);
@@ -104,29 +99,11 @@
     {
         CancelAnyCurrentResponse();
         messages.Clear();
-        messages.Add(new(ChatRole.System, SystemPrompt));
+        messages.Add(new(ChatRole.System, RagAssistant.SystemPrompt));
         chatOptions.ConversationId = null;
         statefulMessageCount = 0;
         chatSuggestions?.Clear();
         await chatInput!.FocusAsync();
-    }
-
-    [Description("Loads the documents needed for performing searches. Must be completed before a search can be executed, but only needs to be completed once.")]
-    private async Task LoadDocumentsAsync()
-    {
-        await InvokeAsync(StateHasChanged);
-        await Search.LoadDocumentsAsync();
-    }
-
-    [Description("Searches for information using a phrase or keyword. Relies on documents already being loaded.")]
-    private async Task<IEnumerable<string>> SearchAsync(
-        [Description("The phrase to search for.")] string searchPhrase,
-        [Description("If possible, specify the filename to search that file only. If not provided or empty, the search includes all files.")] string? filenameFilter = null)
-    {
-        await InvokeAsync(StateHasChanged);
-        var results = await Search.SearchAsync(searchPhrase, filenameFilter, maxResults: 5);
-        return results.Select(result =>
-            $"<result filename=\"{result.DocumentId}\">{result.Text}</result>");
     }
 
     public void Dispose()
