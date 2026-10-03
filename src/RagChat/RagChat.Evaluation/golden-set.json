@@ -1,0 +1,50 @@
+[
+  {
+    "question": "What processor and how much memory does the TrailMaster GPS Watch have?",
+    "expectedDocument": "Example_GPS_Watch.md",
+    "groundTruth": "It has an ARM Cortex processor running at 1.2GHz and 4GB of internal memory.",
+    "userGroups": [
+      "COC-4"
+    ]
+  },
+  {
+    "question": "Which satellite systems does the TrailMaster GPS Watch support?",
+    "expectedDocument": "Example_GPS_Watch.md",
+    "groundTruth": "It supports GPS, GLONASS, and Galileo through a multi-constellation receiver.",
+    "userGroups": [
+      "COC-4"
+    ]
+  },
+  {
+    "question": "How long should I charge the GPS watch before using it for the first time?",
+    "expectedDocument": "Example_GPS_Watch.md",
+    "groundTruth": "Charge it for at least 2 hours, or until the battery indicator shows it is fully charged.",
+    "userGroups": [
+      "COC-4"
+    ]
+  },
+  {
+    "question": "What is the range of the two-way radio in the Life Guard X survival kit?",
+    "expectedDocument": "Example_Emergency_Survival_Kit.pdf",
+    "groundTruth": "The portable two-way radio has a range of up to 20 miles.",
+    "userGroups": [
+      "COC-6"
+    ]
+  },
+  {
+    "question": "What does the multi-tool in the survival kit include?",
+    "expectedDocument": "Example_Emergency_Survival_Kit.pdf",
+    "groundTruth": "The multi-tool includes pliers, knives, screwdrivers, and more.",
+    "userGroups": [
+      "COC-6"
+    ]
+  },
+  {
+    "question": "What kind of food comes in the Life Guard X Emergency Survival Kit?",
+    "expectedDocument": "Example_Emergency_Survival_Kit.pdf",
+    "groundTruth": "High-calorie emergency food rations such as energy bars and dried fruit, with a long shelf life and individually packaged.",
+    "userGroups": [
+      "COC-6"
+    ]
+  }
+]

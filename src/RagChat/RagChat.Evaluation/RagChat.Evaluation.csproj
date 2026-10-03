@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Testing" Version="13.6.0" />
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.10.0" />
     <PackageReference Include="Microsoft.Extensions.AI.Evaluation.Reporting" Version="10.10.0" />
@@ -22,6 +23,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\RagChat.Web\RagChat.Web.csproj" />
+    <ProjectReference Include="..\RagChat.AppHost\RagChat.AppHost.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="golden-set.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The same documents and settings (incl. DocumentAccess policy) the web app uses -->
+    <None Include="..\RagChat.Web\Data\**" LinkBase="Data" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\RagChat.Web\appsettings.json" Link="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
